@@ -10,7 +10,6 @@ import com.jschaofan.ragagent.domain.chat.model.MessageSender
 import com.jschaofan.ragagent.domain.chat.model.MessageStatus
 import com.jschaofan.ragagent.domain.chat.repository.ChatFailure
 import com.jschaofan.ragagent.domain.chat.repository.ChatFailureType
-import com.jschaofan.ragagent.domain.chat.repository.ChatOperationResult
 import com.jschaofan.ragagent.domain.chat.repository.ChatRepository
 import com.jschaofan.ragagent.domain.chat.repository.ChatRepositoryEvent
 import com.jschaofan.ragagent.domain.chat.repository.OutgoingChatAttachment
@@ -302,6 +301,7 @@ class ChatViewModel(
 
     /**
      * 先取消本地 Flow 立即停止界面更新，再通知后端终止生成任务。
+     * 后端停止失败只记录日志，不显示错误提示给用户。
      */
     fun stopGenerating() {
         val state = _uiState.value
@@ -317,20 +317,14 @@ class ChatViewModel(
         finishGeneration()
 
         viewModelScope.launch {
-            when (
-                val result = repository.stopMessage(
+            runCatching {
+                repository.stopMessage(
                     sessionId = state.sessionId,
                     requestId = requestId,
                 )
-            ) {
-                ChatOperationResult.Success -> Unit
-                is ChatOperationResult.Failure -> {
-                    _uiState.update { current ->
-                        current.copy(
-                            pageError = "回复已在本地停止，但通知服务失败：${result.failure.message}",
-                        )
-                    }
-                }
+            }.onFailure { error ->
+                // 后端停止失败不影响用户侧已成功停止的体验，只记录日志
+                android.util.Log.w("ChatViewModel", "Stop notification failed: ${error.message}")
             }
         }
     }

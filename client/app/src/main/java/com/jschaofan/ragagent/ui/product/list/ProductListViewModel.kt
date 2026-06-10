@@ -13,15 +13,11 @@ import kotlinx.coroutines.launch
 
 data class ProductListUiState(
     val products: List<ProductDetail> = emptyList(),
-    val brands: List<String> = emptyList(),
-    val categories: List<String> = emptyList(),
-    val keyword: String = "",
-    val brand: String? = null,
-    val category: String? = null,
-    val status: Int? = 1,
+    val searchKeyword: String = "",
     val currentPage: Int = 1,
     val totalPages: Int = 1,
     val isLoading: Boolean = false,
+    val isSearchResult: Boolean = false,
     val error: String? = null,
 )
 
@@ -30,25 +26,20 @@ class ProductListViewModel(private val api: ProductApi) : ViewModel() {
     val state = _state.asStateFlow()
 
     init {
-        loadFilterOptions()
-        load()
+        loadAllProducts()
     }
 
-    fun load(page: Int = 1) {
+    fun onSearchKeywordChanged(value: String) =
+        _state.update { it.copy(searchKeyword = value, error = null) }
+
+    fun loadAllProducts(page: Int = 1) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-            val filters = _state.value
+            _state.update { it.copy(isLoading = true, error = null, isSearchResult = false) }
             runCatching {
-                val result = if (filters.keyword.isNotBlank()) {
-                    api.searchProducts(filters.keyword.trim(), page).data
-                } else {
-                    api.getProductPage(
-                        pageNum = page,
-                        status = filters.status,
-                        category = filters.category,
-                        brand = filters.brand,
-                    ).data
-                }
+                val result = api.getProductPage(
+                    pageNum = page,
+                    pageSize = PAGE_SIZE,
+                ).data
                 requireNotNull(result) { "服务未返回商品数据" }
             }.onSuccess { result ->
                 _state.update {
@@ -65,33 +56,76 @@ class ProductListViewModel(private val api: ProductApi) : ViewModel() {
         }
     }
 
-    private fun loadFilterOptions() {
+    fun search(resetPage: Boolean = true) {
+        val keyword = _state.value.searchKeyword.trim()
+        if (keyword.isBlank()) return
+
+        val page = if (resetPage) 1 else _state.value.currentPage
         viewModelScope.launch {
-            runCatching { api.getProducts().data.orEmpty() }.onSuccess { products ->
+            _state.update { it.copy(isLoading = true, error = null, isSearchResult = true) }
+            runCatching {
+                val result = api.searchProducts(
+                    keyword = keyword,
+                    pageNum = page,
+                    pageSize = PAGE_SIZE,
+                ).data
+                requireNotNull(result) { "服务未返回商品数据" }
+            }.onSuccess { result ->
                 _state.update {
                     it.copy(
-                        brands = products.mapNotNull { dto -> dto.brand?.takeIf(String::isNotBlank) }.distinct().sorted(),
-                        categories = products.mapNotNull { dto -> dto.category?.takeIf(String::isNotBlank) }.distinct().sorted(),
+                        products = result.records.map { dto -> dto.toDomain() },
+                        currentPage = result.current.toInt(),
+                        totalPages = result.pages.toInt().coerceAtLeast(1),
+                        isLoading = false,
                     )
                 }
+            }.onFailure { error ->
+                _state.update { it.copy(isLoading = false, error = error.message ?: "搜索失败") }
             }
         }
     }
 
-    fun onKeywordChanged(value: String) = _state.update { it.copy(keyword = value) }
-    fun selectBrand(value: String?) = _state.update { it.copy(brand = value) }
-    fun selectCategory(value: String?) = _state.update { it.copy(category = value) }
-    fun selectStatus(value: Int?) = _state.update { it.copy(status = value) }
-    fun previousPage() = load((_state.value.currentPage - 1).coerceAtLeast(1))
-    fun nextPage() = load((_state.value.currentPage + 1).coerceAtMost(_state.value.totalPages))
+    fun reset() {
+        _state.update {
+            it.copy(
+                searchKeyword = "",
+                isSearchResult = false,
+                error = null,
+            )
+        }
+        loadAllProducts()
+    }
 
-    fun reset(isAdmin: Boolean) {
-        _state.update { it.copy(keyword = "", brand = null, category = null, status = if (isAdmin) null else 1) }
-        load()
+    fun nextPage() {
+        val state = _state.value
+        if (state.currentPage >= state.totalPages) return
+        val nextPage = state.currentPage + 1
+        _state.update { it.copy(currentPage = nextPage) }
+        if (state.isSearchResult) {
+            search(resetPage = false)
+        } else {
+            loadAllProducts(nextPage)
+        }
+    }
+
+    fun previousPage() {
+        val state = _state.value
+        if (state.currentPage <= 1) return
+        val prevPage = state.currentPage - 1
+        _state.update { it.copy(currentPage = prevPage) }
+        if (state.isSearchResult) {
+            search(resetPage = false)
+        } else {
+            loadAllProducts(prevPage)
+        }
     }
 
     class Factory(private val api: ProductApi) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T = ProductListViewModel(api) as T
+    }
+
+    private companion object {
+        const val PAGE_SIZE = 10
     }
 }

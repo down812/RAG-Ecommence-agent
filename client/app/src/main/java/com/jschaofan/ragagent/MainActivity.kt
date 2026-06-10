@@ -156,7 +156,6 @@ class MainActivity : ComponentActivity() {
 
                     AppPage.PRODUCT_LIST -> ProductListScreen(
                         viewModel = productListViewModel,
-                        isAdmin = tokenProvider.getUserType() in setOf(0, 1),
                         onBack = { navigate(AppPage.CHAT) },
                         onProductClick = { productId ->
                             productDetailViewModel.loadProduct(productId)

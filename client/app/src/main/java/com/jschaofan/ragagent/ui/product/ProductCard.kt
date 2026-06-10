@@ -81,7 +81,7 @@ fun ProductCardList(
 fun ProductCard(
     product: ProductCardUiModel,
     onClick: () -> Unit,
-    onAddToCart: () -> Unit,
+    onAddToCart: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -147,13 +147,22 @@ fun ProductCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Button(
-                    onClick = onAddToCart,
-                    enabled = product.price != null,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                ) {
-                    Text(if (product.price == null) "价格待确认" else "加入购物车")
+                if (onAddToCart != null && product.isOnSale) {
+                    Button(
+                        onClick = onAddToCart,
+                        enabled = product.price != null,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text(if (product.price == null) "价格待确认" else "加入购物车")
+                    }
+                } else if (!product.isOnSale) {
+                    Text(
+                        text = "已下架",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    )
                 }
             }
         }

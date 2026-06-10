@@ -2,18 +2,22 @@ package com.jschaofan.ragagent.ui.product.list
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -34,7 +38,6 @@ import com.jschaofan.ragagent.ui.product.model.ProductCardUiModel
 @Composable
 fun ProductListScreen(
     viewModel: ProductListViewModel,
-    isAdmin: Boolean,
     onBack: () -> Unit,
     onProductClick: (Long) -> Unit,
     onAddToCart: (ProductDetail) -> Unit,
@@ -60,40 +63,93 @@ fun ProductListScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
-                ProductFilters(state, viewModel, isAdmin)
+                SearchHeader(
+                    keyword = state.searchKeyword,
+                    onKeywordChanged = viewModel::onSearchKeywordChanged,
+                    onSearch = { viewModel.search() },
+                    onReset = viewModel::reset,
+                )
             }
-            if (state.isLoading) {
-                item {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        CircularProgressIndicator()
+
+            when {
+                state.isLoading -> {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
                 }
-            } else if (state.error != null) {
-                item {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(state.error.orEmpty(), color = MaterialTheme.colorScheme.error)
-                        Button(onClick = viewModel::load) { Text("重新加载") }
+
+                state.error != null -> {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = state.error ?: "加载失败",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            TextButton(onClick = viewModel::reset) { Text("重试") }
+                        }
                     }
                 }
-            } else {
-                items(state.products, key = ProductDetail::id) { product ->
-                    ProductCard(
-                        product = product.toCard(),
-                        onClick = { onProductClick(product.id) },
-                        onAddToCart = { onAddToCart(product) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+
+                state.products.isEmpty() -> {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = if (state.isSearchResult) "没有找到相关商品" else "暂无商品",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
-            }
-            item {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = viewModel::previousPage, enabled = state.currentPage > 1) { Text("上一页") }
-                    Text("${state.currentPage} / ${state.totalPages}")
-                    TextButton(onClick = viewModel::nextPage, enabled = state.currentPage < state.totalPages) { Text("下一页") }
+
+                else -> {
+                    item {
+                        Text(
+                            text = if (state.isSearchResult) "搜索结果" else "全部商品",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+
+                    items(state.products, key = ProductDetail::id) { product ->
+                        ProductCard(
+                            product = product.toCard(),
+                            onClick = { onProductClick(product.id) },
+                            onAddToCart = { onAddToCart(product) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(
+                                onClick = viewModel::previousPage,
+                                enabled = state.currentPage > 1,
+                            ) { Text("上一页") }
+                            Text("${state.currentPage} / ${state.totalPages}")
+                            TextButton(
+                                onClick = viewModel::nextPage,
+                                enabled = state.currentPage < state.totalPages,
+                            ) { Text("下一页") }
+                        }
+                    }
                 }
             }
         }
@@ -101,39 +157,46 @@ fun ProductListScreen(
 }
 
 @Composable
-private fun ProductFilters(state: ProductListUiState, viewModel: ProductListViewModel, isAdmin: Boolean) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        OutlinedTextField(
-            value = state.keyword,
-            onValueChange = viewModel::onKeywordChanged,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("按商品名称搜索") },
-            singleLine = true,
-        )
-        Text("品牌", fontWeight = FontWeight.SemiBold)
-        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { FilterChip(selected = state.brand == null, onClick = { viewModel.selectBrand(null) }, label = { Text("全部") }) }
-            items(state.brands) { brand ->
-                FilterChip(selected = state.brand == brand, onClick = { viewModel.selectBrand(brand) }, label = { Text(brand) })
+private fun SearchHeader(
+    keyword: String,
+    onKeywordChanged: (String) -> Unit,
+    onSearch: () -> Unit,
+    onReset: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedTextField(
+                value = keyword,
+                onValueChange = onKeywordChanged,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("搜索商品") },
+                placeholder = { Text("请输入商品名称关键词") },
+                singleLine = true,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Button(
+                    onClick = onSearch,
+                    modifier = Modifier.weight(1f),
+                    enabled = keyword.isNotBlank(),
+                ) {
+                    Text("查询")
+                }
+                TextButton(
+                    onClick = onReset,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("重置")
+                }
             }
-        }
-        Text("类别", fontWeight = FontWeight.SemiBold)
-        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { FilterChip(selected = state.category == null, onClick = { viewModel.selectCategory(null) }, label = { Text("全部") }) }
-            items(state.categories) { category ->
-                FilterChip(selected = state.category == category, onClick = { viewModel.selectCategory(category) }, label = { Text(category) })
-            }
-        }
-        if (isAdmin) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = state.status == null, onClick = { viewModel.selectStatus(null) }, label = { Text("全部") })
-                FilterChip(selected = state.status == 1, onClick = { viewModel.selectStatus(1) }, label = { Text("上架") })
-                FilterChip(selected = state.status == 0, onClick = { viewModel.selectStatus(0) }, label = { Text("下架") })
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = viewModel::load) { Text("查询") }
-            TextButton(onClick = { viewModel.reset(isAdmin) }) { Text("重置") }
         }
     }
 }
@@ -149,4 +212,5 @@ private fun ProductDetail.toCard() = ProductCardUiModel(
     tags = emptyList(),
     salesCount = salesCount,
     badge = if (isOnSale) "在售" else "已下架",
+    isOnSale = isOnSale,
 )

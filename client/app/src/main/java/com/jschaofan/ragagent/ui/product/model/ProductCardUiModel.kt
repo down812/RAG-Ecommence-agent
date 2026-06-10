@@ -21,6 +21,7 @@ data class ProductCardUiModel(
     val tags: List<String>,
     val salesCount: Int?,
     val badge: String?,
+    val isOnSale: Boolean = true,
 )
 
 fun ChatStructuredResult.toProductCards(): List<ProductCardUiModel> = when (this) {
