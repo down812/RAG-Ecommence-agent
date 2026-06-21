@@ -46,6 +46,13 @@ class LoginViewModel(private val repository: AuthRepository) : ViewModel() {
         }
     }
 
+    fun logout(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            repository.logout()
+            onComplete()
+        }
+    }
+
     class Factory(private val repository: AuthRepository) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =

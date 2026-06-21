@@ -74,3 +74,15 @@ data class DatasetCreateDto(
     val description: String = "",
     val disabled: Int = 0,
 )
+
+@Serializable
+data class DatasetFileDto(
+    val id: Long,
+    val name: String,
+    val fileType: String? = null,
+    val fileSize: Long? = null,
+    val datasetId: Long,
+    val disabled: Int = 0,
+    val createdAt: kotlinx.serialization.json.JsonElement? = null,
+    val hitCount: Int = 0,
+)

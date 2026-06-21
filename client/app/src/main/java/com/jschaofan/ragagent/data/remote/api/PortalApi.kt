@@ -9,6 +9,10 @@ import com.jschaofan.ragagent.data.remote.dto.SubaccountCreateDto
 import com.jschaofan.ragagent.data.remote.dto.SubaccountUpdateDto
 import com.jschaofan.ragagent.data.remote.dto.DatasetCreateDto
 import com.jschaofan.ragagent.data.remote.dto.UpdateCartItemDto
+import com.jschaofan.ragagent.data.remote.dto.DatasetFileDto
+import com.jschaofan.ragagent.data.remote.dto.EvaluateDto
+import com.jschaofan.ragagent.data.remote.dto.PageDto
+import okhttp3.ResponseBody
 import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -19,6 +23,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 interface PortalApi {
     @GET("api/cart/get")
@@ -76,4 +81,32 @@ interface PortalApi {
         @Path("datasetId") datasetId: Long,
         @Part file: MultipartBody.Part,
     ): ApiEnvelope<kotlinx.serialization.json.JsonElement>
+
+    @GET("ai/dataset/{datasetId}/files")
+    suspend fun getDatasetFiles(
+        @Path("datasetId") datasetId: Long,
+    ): ApiEnvelope<List<DatasetFileDto>>
+
+    @Streaming
+    @GET("ai/dataset/file/{fileId}")
+    suspend fun downloadDatasetFile(
+        @Path("fileId") fileId: Long,
+    ): ResponseBody
+
+    @DELETE("ai/dataset/file/{fileId}")
+    suspend fun deleteDatasetFile(
+        @Path("fileId") fileId: Long,
+    ): ApiEnvelope<kotlinx.serialization.json.JsonElement>
+
+    @GET("evaluate/page")
+    suspend fun getEvaluations(
+        @Query("current") current: Int = 1,
+        @Query("size") size: Int = 100,
+        @Query("rating") rating: Int? = null,
+    ): ApiEnvelope<PageDto<EvaluateDto>>
+
+    @DELETE("evaluate/delete/{id}")
+    suspend fun deleteEvaluation(
+        @Path("id") id: Long,
+    ): ApiEnvelope<Boolean>
 }

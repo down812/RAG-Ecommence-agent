@@ -3,6 +3,7 @@ package com.ecommerceserver.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ecommerceserver.model.dto.DataSetDTO;
 import com.ecommerceserver.model.entity.DataSet;
+import com.ecommerceserver.model.entity.DatasetFiles;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -52,4 +53,8 @@ public interface DataSetService extends IService<DataSet> {
      * @return 操作结果
      */
     boolean toggleDataSet(Long datasetId, Integer disabled);
+
+    List<DatasetFiles> getDatasetFiles(Long datasetId);
+
+    DatasetFiles getDatasetFile(Long fileId);
 }

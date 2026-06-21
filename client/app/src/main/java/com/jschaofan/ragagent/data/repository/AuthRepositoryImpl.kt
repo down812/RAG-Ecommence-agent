@@ -29,4 +29,18 @@ class AuthRepositoryImpl(
                 )
             },
         )
+
+    override suspend fun logout(): ApiResult<Unit> =
+        runCatching { authApi.logout() }.fold(
+            onSuccess = { response ->
+                if (response.code == 0 || !response.data.isNullOrBlank()) {
+                    ApiResult.Success(Unit)
+                } else {
+                    ApiResult.Failure(response.msg.orEmpty().ifBlank { "退出登录失败" })
+                }
+            },
+            onFailure = { error ->
+                ApiResult.Failure(error.message ?: "退出登录失败", cause = error)
+            },
+        )
 }

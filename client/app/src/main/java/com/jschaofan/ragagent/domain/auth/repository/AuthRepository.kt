@@ -5,4 +5,5 @@ import com.jschaofan.ragagent.domain.auth.model.LoginSession
 
 interface AuthRepository {
     suspend fun login(identifier: String, password: String): ApiResult<LoginSession>
+    suspend fun logout(): ApiResult<Unit>
 }

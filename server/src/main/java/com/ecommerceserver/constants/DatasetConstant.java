@@ -1,6 +1,7 @@
 package com.ecommerceserver.constants;
 
 public class DatasetConstant {
+    public static final String FILE_NOT_EXIST = "文件不存在";
     public static final String DATASET_GET_DIFY_ERR = "从dify获取数据集列表失败";
 
     public static final String FILE_NOT_NULL = "文件不能为空";

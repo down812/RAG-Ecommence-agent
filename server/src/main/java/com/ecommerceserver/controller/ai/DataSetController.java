@@ -4,6 +4,7 @@ import com.ecommerceserver.constants.DatasetConstant;
 import com.ecommerceserver.context.LoginContext;
 import com.ecommerceserver.model.dto.DataSetDTO;
 import com.ecommerceserver.model.entity.DataSet;
+import com.ecommerceserver.model.vo.DatasetFileVO;
 import com.ecommerceserver.result.Result;
 import com.ecommerceserver.service.DataSetService;
 import com.ecommerceserver.service.VectorKnowledgeService;
@@ -98,6 +99,7 @@ public class DataSetController {
     @Operation(summary = "下载文件")
     @GetMapping("/file/{fileId}")
     public ResponseEntity<Resource> download(@PathVariable String fileId) {
+        dataSetService.getDatasetFile(Long.valueOf(fileId));
         Resource resource = vectorKnowledgeService.getFile(fileId);
         if (resource == null) {
             return ResponseEntity.notFound().build();
@@ -121,11 +123,30 @@ public class DataSetController {
             return Result.error("用户未登录");
         }
         
+        dataSetService.getDatasetFile(Long.valueOf(fileId));
         boolean success = vectorKnowledgeService.deleteByFileId(fileId);
         if (success) {
             return Result.success("文件删除成功");
         } else {
             return Result.error("文件删除失败");
         }
+    }
+
+    @Operation(summary = "获取数据集文件列表")
+    @GetMapping("/{datasetId}/files")
+    public Result<List<DatasetFileVO>> getDatasetFiles(@PathVariable Long datasetId) {
+        List<DatasetFileVO> files = dataSetService.getDatasetFiles(datasetId).stream()
+                .map(file -> DatasetFileVO.builder()
+                        .id(file.getId())
+                        .name(file.getName())
+                        .fileType(file.getFileType())
+                        .fileSize(file.getFileSize())
+                        .datasetId(file.getDatasetId())
+                        .disabled(file.getDisabled())
+                        .createdAt(file.getCreatedAt())
+                        .hitCount(file.getHitCount())
+                        .build())
+                .toList();
+        return Result.success(files);
     }
 }

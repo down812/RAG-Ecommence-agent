@@ -79,7 +79,11 @@ class MainActivity : ComponentActivity() {
         )[ProductListViewModel::class.java]
         val adminViewModel = ViewModelProvider(
             this,
-            AdminViewModel.Factory(networkModule.portalApi, applicationContext),
+            AdminViewModel.Factory(
+                networkModule.portalApi,
+                networkModule.productApi,
+                applicationContext,
+            ),
         )[AdminViewModel::class.java]
         val loginViewModel = ViewModelProvider(
             this,
@@ -133,8 +137,10 @@ class MainActivity : ComponentActivity() {
                         onProductsClick = { navigate(AppPage.PRODUCT_LIST) },
                         onAdminClick = { navigate(AppPage.ADMIN) },
                         onLogoutClick = {
-                            tokenProvider.clearSession()
-                            navigate(AppPage.LOGIN)
+                            loginViewModel.logout {
+                                tokenProvider.clearSession()
+                                navigate(AppPage.LOGIN)
+                            }
                         },
                         onProductClick = { product ->
                             productDetailViewModel.loadProduct(product.id)

@@ -39,8 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.jschaofan.ragagent.data.remote.dto.SubaccountDto
+import com.jschaofan.ragagent.data.remote.dto.DatasetFileDto
 
-private enum class AdminPage { HOME, USERS, DATASETS }
+private enum class AdminPage { HOME, USERS, PRODUCTS, DATASETS, EVALUATIONS }
 
 @Composable
 fun AdminScreen(
@@ -58,7 +59,9 @@ fun AdminScreen(
             AdminPage.HOME -> AdminHome(
                 modifier = Modifier.padding(padding),
                 onUsers = { page = AdminPage.USERS },
+                onProducts = { page = AdminPage.PRODUCTS },
                 onDatasets = { page = AdminPage.DATASETS },
+                onEvaluations = { page = AdminPage.EVALUATIONS },
             )
             AdminPage.USERS -> UserManagementScreen(
                 state,
@@ -68,6 +71,8 @@ fun AdminScreen(
                 Modifier.padding(padding),
             )
             AdminPage.DATASETS -> DatasetManagementScreen(state, viewModel, Modifier.padding(padding))
+            AdminPage.PRODUCTS -> AdminProductScreen(state, viewModel, Modifier.padding(padding))
+            AdminPage.EVALUATIONS -> AdminEvaluationScreen(state, viewModel, Modifier.padding(padding))
         }
     }
 }
@@ -86,13 +91,21 @@ private fun AdminHeader(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AdminHome(modifier: Modifier, onUsers: () -> Unit, onDatasets: () -> Unit) {
+private fun AdminHome(
+    modifier: Modifier,
+    onUsers: () -> Unit,
+    onProducts: () -> Unit,
+    onDatasets: () -> Unit,
+    onEvaluations: () -> Unit,
+) {
     Column(
         modifier.fillMaxSize().padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         ManagementEntry("用户管理", "创建、修改和删除子账号", onUsers)
+        ManagementEntry("商品管理", "新建、编辑、上下架商品与 SKU", onProducts)
         ManagementEntry("知识库管理", "管理数据集、启停状态和上传文件", onDatasets)
+        ManagementEntry("评价管理", "查看好评、差评和用户反馈", onEvaluations)
     }
 }
 
@@ -257,6 +270,7 @@ private fun EditUserDialog(
 
 @Composable
 private fun DatasetManagementScreen(state: AdminUiState, viewModel: AdminViewModel, modifier: Modifier) {
+    var filesOpen by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::selectFile)
     }
@@ -288,6 +302,10 @@ private fun DatasetManagementScreen(state: AdminUiState, viewModel: AdminViewMod
                     if (dataset.description.isNotBlank()) Text(dataset.description)
                     Text(if (dataset.disabled == 0) "已启用" else "已禁用")
                     Row {
+                        TextButton(onClick = {
+                            viewModel.loadDatasetFiles(dataset.id)
+                            filesOpen = true
+                        }) { Text("文件") }
                         TextButton(onClick = { viewModel.selectDatasetForUpload(dataset.id); picker.launch(arrayOf("*/*")) }) { Text("选择文件") }
                         TextButton(onClick = viewModel::upload, enabled = state.uploadDatasetId == dataset.id) { Text("上传") }
                         TextButton(onClick = { viewModel.toggleDataset(dataset) }) { Text(if (dataset.disabled == 0) "禁用" else "启用") }
@@ -300,12 +318,68 @@ private fun DatasetManagementScreen(state: AdminUiState, viewModel: AdminViewMod
         state.selectedFileName?.let { item { Text("已选择：$it") } }
         state.message?.let { item { Text(it, color = MaterialTheme.colorScheme.primary) } }
     }
+    if (filesOpen) {
+        DatasetFilesDialog(
+            files = state.datasetFiles,
+            isLoading = state.isLoading,
+            onOpen = viewModel::openDatasetFile,
+            onDelete = viewModel::deleteDatasetFile,
+            onDismiss = { filesOpen = false },
+        )
+    }
+}
+
+@Composable
+private fun DatasetFilesDialog(
+    files: List<DatasetFileDto>,
+    isLoading: Boolean,
+    onOpen: (DatasetFileDto) -> Unit,
+    onDelete: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("数据集文件") },
+        text = {
+            when {
+                isLoading -> CircularProgressIndicator()
+                files.isEmpty() -> Text("暂无文件")
+                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(files, key = DatasetFileDto::id) { file ->
+                        Card {
+                            Column(Modifier.fillMaxWidth().padding(10.dp)) {
+                                Text(file.name, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "${file.fileType.orEmpty()} · ${formatFileSize(file.fileSize)}",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Row {
+                                    TextButton(onClick = { onOpen(file) }) { Text("下载并打开") }
+                                    TextButton(onClick = { onDelete(file.id) }) { Text("删除") }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+    )
+}
+
+private fun formatFileSize(bytes: Long?): String = when {
+    bytes == null -> "未知大小"
+    bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / 1024.0 / 1024.0)
+    bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
+    else -> "$bytes B"
 }
 
 private fun AdminPage.title() = when (this) {
     AdminPage.HOME -> "管理中心"
     AdminPage.USERS -> "用户管理"
     AdminPage.DATASETS -> "知识库管理"
+    AdminPage.PRODUCTS -> "商品管理"
+    AdminPage.EVALUATIONS -> "评价管理"
 }
 
 private fun Int.toRoleName() = when (this) {

@@ -1,12 +1,18 @@
 package com.jschaofan.ragagent.ui.admin
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jschaofan.ragagent.data.remote.api.PortalApi
+import com.jschaofan.ragagent.data.remote.api.ProductApi
 import com.jschaofan.ragagent.data.remote.dto.DatasetCreateDto
+import com.jschaofan.ragagent.data.remote.dto.DatasetFileDto
+import com.jschaofan.ragagent.data.remote.dto.EvaluateDto
+import com.jschaofan.ragagent.data.remote.dto.ProductDetailDto
 import com.jschaofan.ragagent.data.remote.dto.SubaccountCreateDto
 import com.jschaofan.ragagent.data.remote.dto.SubaccountDto
 import com.jschaofan.ragagent.data.remote.dto.SubaccountQueryDto
@@ -25,6 +31,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 data class DatasetItem(
     val id: Long,
@@ -36,6 +43,11 @@ data class DatasetItem(
 data class AdminUiState(
     val users: List<SubaccountDto> = emptyList(),
     val datasets: List<DatasetItem> = emptyList(),
+    val datasetFiles: List<DatasetFileDto> = emptyList(),
+    val selectedDatasetId: Long? = null,
+    val products: List<ProductDetailDto> = emptyList(),
+    val evaluations: List<EvaluateDto> = emptyList(),
+    val evaluationFilter: Int? = null,
     val isLoading: Boolean = false,
     val identifier: String = "",
     val password: String = "",
@@ -49,6 +61,7 @@ data class AdminUiState(
 
 class AdminViewModel(
     private val api: PortalApi,
+    private val productApi: ProductApi,
     private val context: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AdminUiState())
@@ -58,6 +71,8 @@ class AdminViewModel(
     init {
         loadUsers()
         loadDatasets()
+        loadProducts()
+        loadEvaluations()
     }
 
     fun loadUsers() = launchAction {
@@ -122,6 +137,99 @@ class AdminViewModel(
         loadDatasets()
     }
 
+    fun loadDatasetFiles(datasetId: Long) = launchAction {
+        val files = api.getDatasetFiles(datasetId).data.orEmpty()
+        _state.update { it.copy(selectedDatasetId = datasetId, datasetFiles = files) }
+    }
+
+    fun deleteDatasetFile(fileId: Long) = launchAction {
+        api.deleteDatasetFile(fileId)
+        _state.value.selectedDatasetId?.let { datasetId ->
+            _state.update { it.copy(datasetFiles = api.getDatasetFiles(datasetId).data.orEmpty()) }
+        }
+    }
+
+    fun openDatasetFile(file: DatasetFileDto) = launchAction {
+        val directory = File(context.cacheDir, "downloads").apply { mkdirs() }
+        val target = File(directory, file.name.replace(Regex("[\\/:*?\"<>|]"), "_"))
+        api.downloadDatasetFile(file.id).byteStream().use { input ->
+            target.outputStream().use(input::copyTo)
+        }
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            target,
+        )
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, file.mimeType())
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(Intent.createChooser(intent, "打开文件").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    fun loadProducts() = launchAction {
+        _state.update { it.copy(products = productApi.getProducts().data.orEmpty()) }
+    }
+
+    fun saveProduct(product: ProductDetailDto, imageUri: Uri? = null) = launchAction {
+        val productWithImage = if (imageUri == null) {
+            product
+        } else {
+            val file = copyUriToCache(imageUri, "product-image.jpg")
+            val body = file.asRequestBody("image/*".toMediaTypeOrNull())
+            val codeBody = product.productCode.toRequestBody("text/plain".toMediaTypeOrNull())
+            val imageUrl = productApi.uploadProductImage(
+                MultipartBody.Part.createFormData("file", file.name, body),
+                codeBody,
+            ).data
+            file.delete()
+            product.copy(mainImageUrl = imageUrl ?: product.mainImageUrl)
+        }
+        if (productWithImage.id == 0L) {
+            productApi.createProduct(productWithImage)
+        } else {
+            productApi.updateProduct(productWithImage)
+        }
+        loadProducts()
+    }
+
+    fun toggleProduct(product: ProductDetailDto) = launchAction {
+        productApi.updateProduct(product.copy(status = if (product.status == 1) 0 else 1))
+        loadProducts()
+    }
+
+    fun deleteProduct(productId: Long) = launchAction {
+        productApi.deleteProduct(productId)
+        loadProducts()
+    }
+
+    fun replaceProductImage(productId: Long, uri: Uri) {
+        runCatching {
+            val file = copyUriToCache(uri, "product-image")
+            launchAction {
+                val body = file.asRequestBody("image/*".toMediaTypeOrNull())
+                val idBody = productId.toString()
+                    .toRequestBody("text/plain".toMediaTypeOrNull())
+                productApi.updateProductImage(
+                    MultipartBody.Part.createFormData("file", file.name, body),
+                    idBody,
+                )
+                file.delete()
+                loadProducts()
+            }
+        }.onFailure { showMessage(it.message ?: "读取商品图片失败") }
+    }
+
+    fun loadEvaluations(rating: Int? = _state.value.evaluationFilter) = launchAction {
+        val evaluations = api.getEvaluations(rating = rating).data?.records.orEmpty()
+        _state.update { it.copy(evaluations = evaluations, evaluationFilter = rating) }
+    }
+
+    fun deleteEvaluation(id: Long) = launchAction {
+        api.deleteEvaluation(id)
+        val rating = _state.value.evaluationFilter
+        _state.update { it.copy(evaluations = api.getEvaluations(rating = rating).data?.records.orEmpty()) }
+    }
+
     fun selectDatasetForUpload(id: Long) = _state.update { it.copy(uploadDatasetId = id) }
     fun onIdentifierChanged(value: String) = _state.update { it.copy(identifier = value) }
     fun onPasswordChanged(value: String) = _state.update { it.copy(password = value) }
@@ -143,6 +251,14 @@ class AdminViewModel(
             selectedFile = target
             _state.update { it.copy(selectedFileName = name) }
         }.onFailure { showMessage(it.message ?: "读取文件失败") }
+    }
+
+    private fun copyUriToCache(uri: Uri, prefix: String): File {
+        val target = File(context.cacheDir, "$prefix-${System.currentTimeMillis()}")
+        context.contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input).copyTo(target.outputStream())
+        }
+        return target
     }
 
     fun upload() {
@@ -200,8 +316,23 @@ class AdminViewModel(
         super.onCleared()
     }
 
-    class Factory(private val api: PortalApi, private val context: Context) : ViewModelProvider.Factory {
+    private fun DatasetFileDto.mimeType(): String = when (fileType?.lowercase()) {
+        "pdf" -> "application/pdf"
+        "txt", "md" -> "text/plain"
+        "json" -> "application/json"
+        "doc", "docx" -> "application/msword"
+        "xls", "xlsx" -> "application/vnd.ms-excel"
+        "ppt", "pptx" -> "application/vnd.ms-powerpoint"
+        else -> "application/octet-stream"
+    }
+
+    class Factory(
+        private val api: PortalApi,
+        private val productApi: ProductApi,
+        private val context: Context,
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = AdminViewModel(api, context) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            AdminViewModel(api, productApi, context) as T
     }
 }
