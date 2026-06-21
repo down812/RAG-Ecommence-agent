@@ -6,5 +6,6 @@ package com.jschaofan.ragagent.domain.chat.model
 data class ChatSession(
     val sessionId: String,
     val title: String? = null,
+    val createdAtEpochMillis: Long? = null,
     val messages: List<ChatMessage> = emptyList(),
 )

@@ -9,12 +9,15 @@ import com.jschaofan.ragagent.domain.chat.model.ChatMessageError
 import com.jschaofan.ragagent.domain.chat.model.MessageSender
 import com.jschaofan.ragagent.domain.chat.model.MessageStatus
 import com.jschaofan.ragagent.domain.chat.repository.ChatFailure
+import com.jschaofan.ragagent.domain.chat.repository.ChatDataResult
+import com.jschaofan.ragagent.domain.chat.repository.ChatOperationResult
 import com.jschaofan.ragagent.domain.chat.repository.ChatFailureType
 import com.jschaofan.ragagent.domain.chat.repository.ChatRepository
 import com.jschaofan.ragagent.domain.chat.repository.ChatRepositoryEvent
 import com.jschaofan.ragagent.domain.chat.repository.OutgoingChatAttachment
 import com.jschaofan.ragagent.ui.chat.model.ChatUiState
 import com.jschaofan.ragagent.ui.chat.model.PreparedChatImage
+import com.jschaofan.ragagent.ui.chat.model.MessageEvaluationState
 import com.jschaofan.ragagent.ui.chat.media.CameraCaptureTarget
 import com.jschaofan.ragagent.ui.chat.media.ImageAttachmentProcessor
 import kotlinx.coroutines.CancellationException
@@ -48,6 +51,150 @@ class ChatViewModel(
                 inputText = value,
                 pageError = null,
             )
+        }
+    }
+
+    fun refreshSessions() {
+        if (_uiState.value.isLoadingSessions) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingSessions = true, pageError = null) }
+            when (val result = repository.getSessions()) {
+                is ChatDataResult.Success -> _uiState.update {
+                    it.copy(sessions = result.value, isLoadingSessions = false)
+                }
+                is ChatDataResult.Failure -> _uiState.update {
+                    it.copy(isLoadingSessions = false, pageError = result.failure.message)
+                }
+            }
+        }
+    }
+
+    fun loadSession(sessionId: String) {
+        val state = _uiState.value
+        if (state.isGenerating || state.isLoadingSession || state.sessionId == sessionId) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingSession = true, pageError = null) }
+            when (val result = repository.getSessionMessages(sessionId)) {
+                is ChatDataResult.Success -> {
+                    clearSelectedImages()
+                    _uiState.update {
+                        it.copy(
+                            sessionId = sessionId,
+                            messages = result.value,
+                            inputText = "",
+                            selectedImages = emptyList(),
+                            evaluations = emptyMap(),
+                            isLoadingSession = false,
+                        )
+                    }
+                }
+                is ChatDataResult.Failure -> _uiState.update {
+                    it.copy(isLoadingSession = false, pageError = result.failure.message)
+                }
+            }
+        }
+    }
+
+    fun createNewSession() {
+        val state = _uiState.value
+        if (state.isGenerating || state.isLoadingSession) return
+        clearSelectedImages()
+        _uiState.update {
+            it.copy(
+                sessionId = repository.createSessionId(),
+                messages = emptyList(),
+                inputText = "",
+                selectedImages = emptyList(),
+                evaluations = emptyMap(),
+                pageError = null,
+            )
+        }
+    }
+
+    fun deleteSession(sessionId: String) {
+        val state = _uiState.value
+        if (state.isGenerating || state.deletingSessionId != null) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(deletingSessionId = sessionId, pageError = null) }
+            when (val result = repository.deleteSession(sessionId)) {
+                ChatOperationResult.Success -> {
+                    val deletingCurrent = _uiState.value.sessionId == sessionId
+                    if (deletingCurrent) clearSelectedImages()
+                    _uiState.update {
+                        it.copy(
+                            sessionId = if (deletingCurrent) repository.createSessionId() else it.sessionId,
+                            messages = if (deletingCurrent) emptyList() else it.messages,
+                            inputText = if (deletingCurrent) "" else it.inputText,
+                            selectedImages = if (deletingCurrent) emptyList() else it.selectedImages,
+                            evaluations = if (deletingCurrent) emptyMap() else it.evaluations,
+                            sessions = it.sessions.filterNot { session -> session.sessionId == sessionId },
+                            deletingSessionId = null,
+                        )
+                    }
+                }
+                is ChatOperationResult.Failure -> _uiState.update {
+                    it.copy(deletingSessionId = null, pageError = result.failure.message)
+                }
+            }
+        }
+    }
+
+    fun submitEvaluation(
+        assistantMessageId: String,
+        rating: Int,
+        comment: String? = null,
+    ) {
+        require(rating == RATING_LIKE || rating == RATING_DISLIKE)
+        val state = _uiState.value
+        val message = state.messages.firstOrNull {
+            it.id == assistantMessageId &&
+                it.sender == MessageSender.ASSISTANT &&
+                it.status == MessageStatus.COMPLETED
+        } ?: return
+        if (state.evaluations[assistantMessageId]?.isSubmitting == true) return
+
+        val previousEvaluation = state.evaluations[assistantMessageId]
+        _uiState.update {
+            it.copy(
+                evaluations = it.evaluations + (
+                    assistantMessageId to (
+                        previousEvaluation?.copy(isSubmitting = true)
+                            ?: MessageEvaluationState(isSubmitting = true)
+                    )
+                ),
+                pageError = null,
+            )
+        }
+        viewModelScope.launch {
+            when (
+                val result = repository.submitEvaluation(
+                    sessionId = state.sessionId,
+                    messageId = message.requestId,
+                    rating = rating,
+                    comment = comment,
+                )
+            ) {
+                is ChatDataResult.Success -> _uiState.update {
+                    it.copy(
+                        evaluations = it.evaluations + (
+                            assistantMessageId to MessageEvaluationState(
+                                rating = result.value.rating,
+                                comment = result.value.comment,
+                            )
+                        ),
+                    )
+                }
+                is ChatDataResult.Failure -> _uiState.update {
+                    it.copy(
+                        evaluations = if (previousEvaluation == null) {
+                            it.evaluations - assistantMessageId
+                        } else {
+                            it.evaluations + (assistantMessageId to previousEvaluation)
+                        },
+                        pageError = result.failure.message,
+                    )
+                }
+            }
         }
     }
 
@@ -337,6 +484,10 @@ class ChatViewModel(
         _uiState.update { state -> state.copy(pageError = message) }
     }
 
+    private fun clearSelectedImages() {
+        _uiState.value.selectedImages.forEach { image -> image.file.delete() }
+    }
+
     private fun handleStreamEvent(
         assistantMessageId: String,
         event: ChatRepositoryEvent,
@@ -458,5 +609,7 @@ class ChatViewModel(
         const val MAX_IMAGE_COUNT = 3
         const val IMAGE_SEARCH_PROMPT = "请根据图片查找相似商品"
         const val IMAGE_MEDIA_TYPE = "image/jpeg"
+        const val RATING_LIKE = 1
+        const val RATING_DISLIKE = -1
     }
 }

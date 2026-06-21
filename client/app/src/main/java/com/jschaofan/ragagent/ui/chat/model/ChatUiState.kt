@@ -1,6 +1,7 @@
 package com.jschaofan.ragagent.ui.chat.model
 
 import com.jschaofan.ragagent.domain.chat.model.ChatMessage
+import com.jschaofan.ragagent.domain.chat.model.ChatSession
 import java.io.File
 
 data class PreparedChatImage(
@@ -8,6 +9,12 @@ data class PreparedChatImage(
     val file: File,
     val mediaType: String,
     val fingerprint: String,
+)
+
+data class MessageEvaluationState(
+    val rating: Int? = null,
+    val comment: String? = null,
+    val isSubmitting: Boolean = false,
 )
 
 /**
@@ -22,10 +29,16 @@ data class ChatUiState(
     val isGenerating: Boolean = false,
     val activeRequestId: String? = null,
     val activeAssistantMessageId: String? = null,
+    val sessions: List<ChatSession> = emptyList(),
+    val isLoadingSessions: Boolean = false,
+    val isLoadingSession: Boolean = false,
+    val deletingSessionId: String? = null,
+    val evaluations: Map<String, MessageEvaluationState> = emptyMap(),
     val pageError: String? = null,
 ) {
     val canSend: Boolean
         get() = (inputText.isNotBlank() || selectedImages.isNotEmpty()) &&
             !isGenerating &&
-            !isPreparingImage
+            !isPreparingImage &&
+            !isLoadingSession
 }

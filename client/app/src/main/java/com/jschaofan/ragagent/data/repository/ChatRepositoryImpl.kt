@@ -4,10 +4,13 @@ import com.jschaofan.ragagent.data.mapper.toDomain
 import com.jschaofan.ragagent.data.remote.api.ChatApi
 import com.jschaofan.ragagent.data.remote.dto.ChatAttachment
 import com.jschaofan.ragagent.data.remote.dto.ChatStreamRequest
+import com.jschaofan.ragagent.data.remote.dto.EvaluateRequestDto
+import com.jschaofan.ragagent.domain.chat.model.ChatEvaluation
 import com.jschaofan.ragagent.data.remote.sse.ChatSseException
 import com.jschaofan.ragagent.data.remote.sse.ChatStreamDataSource
 import com.jschaofan.ragagent.data.remote.sse.ChatStreamEvent
 import com.jschaofan.ragagent.domain.chat.repository.ChatFailure
+import com.jschaofan.ragagent.domain.chat.repository.ChatDataResult
 import com.jschaofan.ragagent.domain.chat.repository.ChatFailureType
 import com.jschaofan.ragagent.domain.chat.repository.ChatOperationResult
 import com.jschaofan.ragagent.domain.chat.repository.ChatRepository
@@ -91,6 +94,73 @@ class ChatRepositoryImpl(
             ChatOperationResult.Failure(throwable.toChatFailure())
         }
     }
+
+    override suspend fun getSessions() = executeDataRequest {
+        chatApi.getSessions().toDataResult { sessions -> sessions.map { it.toDomain() } }
+    }
+
+    override suspend fun getSessionMessages(sessionId: String) = executeDataRequest {
+        chatApi.getSession(sessionId).toDataResult { messages -> messages.map { it.toDomain() } }
+    }
+
+    override suspend fun deleteSession(sessionId: String): ChatOperationResult {
+        return try {
+            val response = chatApi.deleteSession(sessionId)
+            if (response.code == SUCCESS_CODE) ChatOperationResult.Success else response.toOperationFailure()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            ChatOperationResult.Failure(throwable.toChatFailure())
+        }
+    }
+
+    override suspend fun submitEvaluation(
+        sessionId: String,
+        messageId: String,
+        rating: Int,
+        comment: String?,
+    ) = executeDataRequest {
+        chatApi.submitEvaluation(
+            EvaluateRequestDto(
+                sessionId = sessionId,
+                messageId = messageId,
+                rating = rating,
+                comment = comment?.trim()?.takeIf(String::isNotEmpty),
+            ),
+        ).toDataResult { evaluation ->
+            ChatEvaluation(
+                messageId = evaluation.messageId,
+                rating = evaluation.rating,
+                comment = evaluation.comment,
+            )
+        }
+    }
+
+    private suspend fun <T> executeDataRequest(block: suspend () -> ChatDataResult<T>): ChatDataResult<T> =
+        try {
+            block()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            ChatDataResult.Failure(throwable.toChatFailure())
+        }
+
+    private fun <T, R> com.jschaofan.ragagent.core.network.ApiEnvelope<T>.toDataResult(
+        transform: (T) -> R,
+    ): ChatDataResult<R> = if (code == SUCCESS_CODE && data != null) {
+        ChatDataResult.Success(transform(data))
+    } else {
+        ChatDataResult.Failure(serverFailure())
+    }
+
+    private fun com.jschaofan.ragagent.core.network.ApiEnvelope<*>.toOperationFailure() =
+        ChatOperationResult.Failure(serverFailure())
+
+    private fun com.jschaofan.ragagent.core.network.ApiEnvelope<*>.serverFailure() = ChatFailure(
+        type = ChatFailureType.SERVER,
+        message = msg.orEmpty().ifBlank { DEFAULT_SERVER_ERROR },
+        code = code.toString(),
+    )
 
     private fun ChatStreamEvent.toRepositoryEvent(): ChatRepositoryEvent = when (this) {
         is ChatStreamEvent.Content -> ChatRepositoryEvent.Content(text)

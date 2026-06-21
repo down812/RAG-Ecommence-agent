@@ -3,7 +3,11 @@ package com.jschaofan.ragagent.data.repository
 import com.jschaofan.ragagent.core.network.ApiEnvelope
 import com.jschaofan.ragagent.data.remote.api.ChatApi
 import com.jschaofan.ragagent.data.remote.dto.ChatResultDto
+import com.jschaofan.ragagent.data.remote.dto.ChatSessionMessageDto
+import com.jschaofan.ragagent.data.remote.dto.ChatSessionSummaryDto
 import com.jschaofan.ragagent.data.remote.dto.ChatStreamRequest
+import com.jschaofan.ragagent.data.remote.dto.EvaluateDto
+import com.jschaofan.ragagent.data.remote.dto.EvaluateRequestDto
 import com.jschaofan.ragagent.data.remote.dto.RecommendedProductDto
 import com.jschaofan.ragagent.data.remote.dto.StreamErrorDto
 import com.jschaofan.ragagent.data.remote.sse.ChatSseException
@@ -257,6 +261,20 @@ class ChatRepositoryImplTest {
     ) : ChatApi {
         var lastSessionId: String? = null
         var lastMessageId: String? = null
+
+        override suspend fun submitEvaluation(
+            request: EvaluateRequestDto,
+        ): ApiEnvelope<EvaluateDto> = error("Unused in this test")
+
+        override suspend fun getSessions(): ApiEnvelope<List<ChatSessionSummaryDto>> =
+            error("Unused in this test")
+
+        override suspend fun getSession(
+            sessionId: String,
+        ): ApiEnvelope<List<ChatSessionMessageDto>> = error("Unused in this test")
+
+        override suspend fun deleteSession(sessionId: String): ApiEnvelope<String> =
+            error("Unused in this test")
 
         override suspend fun stopChat(
             sessionId: String,

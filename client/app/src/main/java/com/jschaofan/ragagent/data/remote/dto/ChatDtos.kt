@@ -8,6 +8,23 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonElement
 import java.io.File
 
+@Serializable
+data class ChatSessionSummaryDto(
+    val sessionId: String,
+    val title: String? = null,
+    val createdAt: JsonElement? = null,
+)
+
+@Serializable
+data class ChatSessionMessageDto(
+    val sessionId: String,
+    val messageId: String,
+    val content: String = "",
+    val result: ChatResultDto? = null,
+    val messageType: String? = null,
+    val createdAt: JsonElement? = null,
+)
+
 /**
  * App 内部使用的聊天请求模型。
  *

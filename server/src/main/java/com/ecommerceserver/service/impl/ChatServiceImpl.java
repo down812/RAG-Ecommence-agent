@@ -133,7 +133,10 @@ public class ChatServiceImpl implements ChatService {
         if (StringUtils.isEmpty(sessionId)) {
             throw new GlobalException(Result.error(AIConstant.CONVERSATION_ID_NOT_NULL));
         }
-        logService.remove(new LambdaQueryWrapper<Log>().eq(Log::getSessionId, sessionId));
+        Long userId = LoginContext.getUserId();
+        logService.remove(new LambdaQueryWrapper<Log>()
+                .eq(Log::getSessionId, sessionId)
+                .eq(Log::getUserId, userId));
     }
 
     @Override
@@ -142,8 +145,11 @@ public class ChatServiceImpl implements ChatService {
             throw new GlobalException(Result.error(AIConstant.CONVERSATION_ID_NOT_NULL));
         }
 
+        Long userId = LoginContext.getUserId();
         LambdaQueryWrapper<Log> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Log::getSessionId, sessionId).orderByAsc(Log::getCreatedAt);
+        wrapper.eq(Log::getSessionId, sessionId)
+                .eq(Log::getUserId, userId)
+                .orderByAsc(Log::getCreatedAt);
         List<Log> logs = logService.list(wrapper);
 
         List<SessionInfo> sessionInfos = new ArrayList<>();

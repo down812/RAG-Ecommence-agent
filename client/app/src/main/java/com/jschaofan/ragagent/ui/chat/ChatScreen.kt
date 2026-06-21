@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -63,6 +65,7 @@ import com.jschaofan.ragagent.domain.chat.model.MessageSender
 import com.jschaofan.ragagent.domain.chat.model.MessageStatus
 import com.jschaofan.ragagent.ui.chat.model.ChatUiState
 import com.jschaofan.ragagent.ui.chat.model.PreparedChatImage
+import com.jschaofan.ragagent.ui.chat.model.MessageEvaluationState
 import com.jschaofan.ragagent.ui.chat.media.CameraCaptureTarget
 import com.jschaofan.ragagent.ui.product.ProductCardList
 import com.jschaofan.ragagent.ui.product.model.ProductCardUiModel
@@ -87,6 +90,7 @@ fun ChatScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var cameraTarget by remember { mutableStateOf<CameraCaptureTarget?>(null) }
+    var historyOpen by remember { mutableStateOf(false) }
     val sendAndDismissKeyboard = {
         if (uiState.canSend) {
             viewModel.sendMessage()
@@ -114,6 +118,7 @@ fun ChatScreen(
         onSendClick = sendAndDismissKeyboard,
         onStopClick = viewModel::stopGenerating,
         onRetryClick = viewModel::retryMessage,
+        onEvaluate = viewModel::submitEvaluation,
         onProductClick = onProductClick,
         onAddToCart = onAddToCart,
         cartItemCount = cartItemCount,
@@ -121,6 +126,10 @@ fun ChatScreen(
         onProductsClick = onProductsClick,
         onAdminClick = onAdminClick,
         onLogoutClick = onLogoutClick,
+        onHistoryClick = {
+            historyOpen = true
+            viewModel.refreshSessions()
+        },
         onGalleryClick = {
             galleryLauncher.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -143,6 +152,23 @@ fun ChatScreen(
         onPageErrorShown = viewModel::clearPageError,
         modifier = modifier,
     )
+
+    if (historyOpen) {
+        ChatHistoryDialog(
+            uiState = uiState,
+            onDismiss = { historyOpen = false },
+            onRefresh = viewModel::refreshSessions,
+            onNewSession = {
+                viewModel.createNewSession()
+                historyOpen = false
+            },
+            onSessionClick = { sessionId ->
+                viewModel.loadSession(sessionId)
+                historyOpen = false
+            },
+            onDeleteSession = viewModel::deleteSession,
+        )
+    }
 }
 
 @Composable
@@ -153,6 +179,7 @@ private fun ChatScreenContent(
     onSendClick: () -> Unit,
     onStopClick: () -> Unit,
     onRetryClick: (String) -> Unit,
+    onEvaluate: (String, Int, String?) -> Unit,
     onProductClick: (ProductCardUiModel) -> Unit,
     onAddToCart: (ProductCardUiModel) -> Unit,
     cartItemCount: Int,
@@ -160,6 +187,7 @@ private fun ChatScreenContent(
     onProductsClick: () -> Unit,
     onAdminClick: () -> Unit,
     onLogoutClick: () -> Unit,
+    onHistoryClick: () -> Unit,
     onGalleryClick: () -> Unit,
     onCameraClick: () -> Unit,
     onRemoveImage: (String) -> Unit,
@@ -199,6 +227,8 @@ private fun ChatScreenContent(
                 onProductsClick = onProductsClick,
                 onAdminClick = onAdminClick,
                 onLogoutClick = onLogoutClick,
+                onHistoryClick = onHistoryClick,
+                historyEnabled = !uiState.isGenerating && !uiState.isLoadingSession,
             )
         },
         bottomBar = {
@@ -217,7 +247,23 @@ private fun ChatScreenContent(
             )
         },
     ) { innerPadding ->
-        if (uiState.messages.isEmpty()) {
+        if (uiState.isLoadingSession) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Text(
+                        text = "正在加载会话",
+                        modifier = Modifier.padding(top = 12.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else if (uiState.messages.isEmpty()) {
             EmptyChatContent(
                 onSuggestionClick = onInputChanged,
                 modifier = Modifier.padding(innerPadding),
@@ -241,6 +287,8 @@ private fun ChatScreenContent(
                     ChatMessageItem(
                         message = message,
                         onRetryClick = onRetryClick,
+                        evaluationState = uiState.evaluations[message.id],
+                        onEvaluate = onEvaluate,
                         onProductClick = onProductClick,
                         onAddToCart = onAddToCart,
                     )
@@ -258,6 +306,8 @@ private fun ChatHeader(
     onProductsClick: () -> Unit,
     onAdminClick: () -> Unit,
     onLogoutClick: () -> Unit,
+    onHistoryClick: () -> Unit,
+    historyEnabled: Boolean,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Surface(
@@ -296,6 +346,12 @@ private fun ChatHeader(
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
+            TextButton(
+                onClick = onHistoryClick,
+                enabled = historyEnabled,
+            ) {
+                Text("历史")
+            }
             Box {
                 TextButton(onClick = { menuExpanded = true }) {
                     Text(if (cartItemCount > 0) "功能 ($cartItemCount)" else "功能")
@@ -340,6 +396,99 @@ private fun ChatHeader(
             }
         }
     }
+}
+
+@Composable
+private fun ChatHistoryDialog(
+    uiState: ChatUiState,
+    onDismiss: () -> Unit,
+    onRefresh: () -> Unit,
+    onNewSession: () -> Unit,
+    onSessionClick: (String) -> Unit,
+    onDeleteSession: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("历史会话") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = onNewSession,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("新建对话")
+                }
+                HorizontalDivider()
+                when {
+                    uiState.isLoadingSessions -> Box(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    }
+                    uiState.sessions.isEmpty() -> Text(
+                        text = "暂无历史会话",
+                        modifier = Modifier.padding(vertical = 20.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(uiState.sessions, key = { it.sessionId }) { session ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSessionClick(session.sessionId) }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = session.title?.takeIf(String::isNotBlank) ?: "未命名会话",
+                                        maxLines = 2,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (session.sessionId == uiState.sessionId) {
+                                            FontWeight.Bold
+                                        } else {
+                                            FontWeight.Normal
+                                        },
+                                    )
+                                    if (session.sessionId == uiState.sessionId) {
+                                        Text(
+                                            text = "当前会话",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                }
+                                TextButton(
+                                    onClick = { onDeleteSession(session.sessionId) },
+                                    enabled = uiState.deletingSessionId == null,
+                                ) {
+                                    if (uiState.deletingSessionId == session.sessionId) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Text("删除")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("关闭") }
+        },
+        dismissButton = {
+            TextButton(onClick = onRefresh, enabled = !uiState.isLoadingSessions) {
+                Text("刷新")
+            }
+        },
+    )
 }
 
 @Composable
@@ -408,6 +557,8 @@ private fun EmptyChatContent(
 private fun ChatMessageItem(
     message: ChatMessage,
     onRetryClick: (String) -> Unit,
+    evaluationState: MessageEvaluationState?,
+    onEvaluate: (String, Int, String?) -> Unit,
     onProductClick: (ProductCardUiModel) -> Unit,
     onAddToCart: (ProductCardUiModel) -> Unit,
     modifier: Modifier = Modifier,
@@ -452,7 +603,72 @@ private fun ChatMessageItem(
                 message = message,
                 onRetryClick = onRetryClick,
             )
+            if (message.sender == MessageSender.ASSISTANT && message.status == MessageStatus.COMPLETED) {
+                MessageEvaluationActions(
+                    messageId = message.id,
+                    state = evaluationState,
+                    onEvaluate = onEvaluate,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun MessageEvaluationActions(
+    messageId: String,
+    state: MessageEvaluationState?,
+    onEvaluate: (String, Int, String?) -> Unit,
+) {
+    var feedbackOpen by remember(messageId) { mutableStateOf(false) }
+    var comment by remember(messageId) { mutableStateOf(state?.comment.orEmpty()) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TextButton(
+            onClick = { onEvaluate(messageId, RATING_LIKE, null) },
+            enabled = state?.isSubmitting != true,
+        ) {
+            Text(if (state?.rating == RATING_LIKE) "已赞" else "有帮助")
+        }
+        TextButton(
+            onClick = { feedbackOpen = true },
+            enabled = state?.isSubmitting != true,
+        ) {
+            Text(if (state?.rating == RATING_DISLIKE) "已反馈" else "没帮助")
+        }
+        if (state?.isSubmitting == true) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+            )
+        }
+    }
+
+    if (feedbackOpen) {
+        AlertDialog(
+            onDismissRequest = { feedbackOpen = false },
+            title = { Text("反馈这条回答") },
+            text = {
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("哪里可以改进（选填）") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onEvaluate(messageId, RATING_DISLIKE, comment)
+                        feedbackOpen = false
+                    },
+                ) { Text("提交") }
+            },
+            dismissButton = {
+                TextButton(onClick = { feedbackOpen = false }) { Text("取消") }
+            },
+        )
     }
 }
 
@@ -773,6 +989,7 @@ private fun ChatScreenPreview() {
             onSendClick = {},
             onStopClick = {},
             onRetryClick = {},
+            onEvaluate = { _, _, _ -> },
             onProductClick = {},
             onAddToCart = {},
             cartItemCount = 0,
@@ -780,6 +997,7 @@ private fun ChatScreenPreview() {
             onProductsClick = {},
             onAdminClick = {},
             onLogoutClick = {},
+            onHistoryClick = {},
             onGalleryClick = {},
             onCameraClick = {},
             onRemoveImage = {},
@@ -789,6 +1007,8 @@ private fun ChatScreenPreview() {
 }
 
 private const val MAX_IMAGE_COUNT = 3
+private const val RATING_LIKE = 1
+private const val RATING_DISLIKE = -1
 private val QUICK_QUESTIONS = listOf(
     "推荐一款通勤耳机",
     "500元以内跑鞋",

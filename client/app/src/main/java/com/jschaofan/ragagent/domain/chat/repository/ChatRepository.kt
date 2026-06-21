@@ -1,6 +1,9 @@
 package com.jschaofan.ragagent.domain.chat.repository
 
 import com.jschaofan.ragagent.domain.chat.model.ChatStructuredResult
+import com.jschaofan.ragagent.domain.chat.model.ChatMessage
+import com.jschaofan.ragagent.domain.chat.model.ChatSession
+import com.jschaofan.ragagent.domain.chat.model.ChatEvaluation
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 
@@ -33,6 +36,24 @@ interface ChatRepository {
         sessionId: String,
         requestId: String,
     ): ChatOperationResult
+
+    suspend fun getSessions(): ChatDataResult<List<ChatSession>>
+
+    suspend fun getSessionMessages(sessionId: String): ChatDataResult<List<ChatMessage>>
+
+    suspend fun deleteSession(sessionId: String): ChatOperationResult
+
+    suspend fun submitEvaluation(
+        sessionId: String,
+        messageId: String,
+        rating: Int,
+        comment: String? = null,
+    ): ChatDataResult<ChatEvaluation>
+}
+
+sealed interface ChatDataResult<out T> {
+    data class Success<T>(val value: T) : ChatDataResult<T>
+    data class Failure(val failure: ChatFailure) : ChatDataResult<Nothing>
 }
 
 data class ChatStream(

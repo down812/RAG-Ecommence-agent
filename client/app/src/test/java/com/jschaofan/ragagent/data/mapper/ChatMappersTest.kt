@@ -1,6 +1,8 @@
 package com.jschaofan.ragagent.data.mapper
 
 import com.jschaofan.ragagent.data.remote.dto.ChatResultDto
+import com.jschaofan.ragagent.data.remote.dto.ChatSessionMessageDto
+import com.jschaofan.ragagent.data.remote.dto.ChatSessionSummaryDto
 import com.jschaofan.ragagent.data.remote.dto.ImageAnalysisDto
 import com.jschaofan.ragagent.data.remote.dto.ImageSearchProductDto
 import com.jschaofan.ragagent.data.remote.dto.QueryAnalysisDto
@@ -12,8 +14,31 @@ import com.jschaofan.ragagent.domain.chat.model.MessageSender
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.serialization.json.JsonPrimitive
 
 class ChatMappersTest {
+    @Test
+    fun `maps history summaries and messages`() {
+        val session = ChatSessionSummaryDto(
+            sessionId = "session-1",
+            title = "推荐耳机",
+            createdAt = JsonPrimitive(1000L),
+        ).toDomain()
+        val message = ChatSessionMessageDto(
+            sessionId = "session-1",
+            messageId = "message-1",
+            content = "推荐耳机",
+            messageType = "USER",
+            createdAt = JsonPrimitive(2000L),
+        ).toDomain()
+
+        assertEquals("推荐耳机", session.title)
+        assertEquals(1000L, session.createdAtEpochMillis)
+        assertEquals(MessageSender.USER, message.sender)
+        assertEquals("message-1", message.requestId)
+        assertEquals(2000L, message.createdAtEpochMillis)
+    }
+
     @Test
     fun `maps documented message types without case sensitivity`() {
         assertEquals(MessageSender.USER, "user".toMessageSender())

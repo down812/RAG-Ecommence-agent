@@ -16,7 +16,7 @@ import java.nio.file.Files
 
 class ChatSseClientTest {
     @Test
-    fun `sends valid empty multipart body for text only chat`() {
+    fun `sends an empty body for text only chat`() {
         val server = MockWebServer()
         server.enqueue(
             MockResponse()
@@ -49,9 +49,8 @@ class ChatSseClientTest {
             }
             val request = server.takeRequest()
 
-            val contentType = request.getHeader("Content-Type").orEmpty()
-            assertTrue(contentType.startsWith("multipart/form-data; boundary="))
-            assertTrue(request.body.readUtf8().endsWith("--\r\n"))
+            assertEquals(null, request.getHeader("Content-Type"))
+            assertEquals(0L, request.bodySize)
         } finally {
             server.shutdown()
         }

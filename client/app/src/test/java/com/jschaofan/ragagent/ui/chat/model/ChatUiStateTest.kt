@@ -16,6 +16,13 @@ class ChatUiStateTest {
                 isGenerating = true,
             ).canSend,
         )
+        assertFalse(
+            ChatUiState(
+                sessionId = "1",
+                inputText = "推荐手机",
+                isLoadingSession = true,
+            ).canSend,
+        )
         assertTrue(ChatUiState(sessionId = "1", inputText = "推荐手机").canSend)
     }
 }

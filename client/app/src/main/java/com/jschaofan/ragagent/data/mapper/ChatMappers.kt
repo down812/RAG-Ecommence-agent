@@ -1,6 +1,8 @@
 package com.jschaofan.ragagent.data.mapper
 
 import com.jschaofan.ragagent.data.remote.dto.ChatResultDto
+import com.jschaofan.ragagent.data.remote.dto.ChatSessionMessageDto
+import com.jschaofan.ragagent.data.remote.dto.ChatSessionSummaryDto
 import com.jschaofan.ragagent.data.remote.dto.FaqDto
 import com.jschaofan.ragagent.data.remote.dto.ImageAnalysisDto
 import com.jschaofan.ragagent.data.remote.dto.ImageSearchProductDto
@@ -12,17 +14,55 @@ import com.jschaofan.ragagent.data.remote.dto.SearchProductDto
 import com.jschaofan.ragagent.data.remote.dto.SourceDto
 import com.jschaofan.ragagent.data.remote.dto.UserReviewDto
 import com.jschaofan.ragagent.domain.chat.model.ChatSource
+import com.jschaofan.ragagent.domain.chat.model.ChatMessage
+import com.jschaofan.ragagent.domain.chat.model.ChatSession
 import com.jschaofan.ragagent.domain.chat.model.ChatStructuredResult
 import com.jschaofan.ragagent.domain.chat.model.Faq
 import com.jschaofan.ragagent.domain.chat.model.ImageAnalysis
 import com.jschaofan.ragagent.domain.chat.model.ImageSearchProduct
 import com.jschaofan.ragagent.domain.chat.model.MessageSender
+import com.jschaofan.ragagent.domain.chat.model.MessageStatus
 import com.jschaofan.ragagent.domain.chat.model.QueryAnalysis
 import com.jschaofan.ragagent.domain.chat.model.RagSource
 import com.jschaofan.ragagent.domain.chat.model.RecommendedProduct
 import com.jschaofan.ragagent.domain.chat.model.SearchCriteria
 import com.jschaofan.ragagent.domain.chat.model.SearchProduct
 import com.jschaofan.ragagent.domain.chat.model.UserReview
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import java.text.SimpleDateFormat
+import java.util.Locale
+
+fun ChatSessionSummaryDto.toDomain() = ChatSession(
+    sessionId = sessionId,
+    title = title,
+    createdAtEpochMillis = createdAt.toEpochMillis(),
+)
+
+fun ChatSessionMessageDto.toDomain(): ChatMessage {
+    val sender = messageType.toMessageSender()
+    return ChatMessage(
+        id = "$messageId-${sender.name.lowercase()}",
+        requestId = messageId,
+        sender = sender,
+        content = content,
+        status = MessageStatus.COMPLETED,
+        structuredResult = result?.toDomain(),
+        createdAtEpochMillis = createdAt.toEpochMillis() ?: 0L,
+    )
+}
+
+private fun JsonElement?.toEpochMillis(): Long? {
+    val primitive = this as? JsonPrimitive ?: return null
+    primitive.longOrNull?.let { return it }
+    val value = runCatching { primitive.jsonPrimitive.content }.getOrNull() ?: return null
+    val patterns = listOf("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm")
+    return patterns.firstNotNullOfOrNull { pattern ->
+        runCatching { SimpleDateFormat(pattern, Locale.ROOT).parse(value)?.time }.getOrNull()
+    }
+}
 
 /**
  * 将后端 messageType 转换成客户端发送方类型。

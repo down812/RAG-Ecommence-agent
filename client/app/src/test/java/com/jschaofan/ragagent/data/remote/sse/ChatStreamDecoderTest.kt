@@ -106,8 +106,8 @@ class ChatStreamDecoderTest {
         val source = result.sources.first()
         assertEquals("选购指南", source.title)
         assertEquals("商品介绍", source.ragSource?.productInfo)
-        assertEquals("敏感肌可以使用吗？", source.ragSource?.official_faq?.first()?.question)
-        assertEquals("用户A", source.ragSource?.user_reviews?.first()?.nickname)
+        assertEquals("敏感肌可以使用吗？", source.ragSource?.officialFAQ?.first()?.question)
+        assertEquals("用户A", source.ragSource?.userReviews?.first()?.nickname)
     }
 
     @Test
