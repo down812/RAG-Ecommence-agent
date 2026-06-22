@@ -17,7 +17,7 @@ class ChatApiTest {
             MockResponse()
                 .setHeader("Content-Type", "application/json")
                 .setBody(
-                    """{"code":0,"data":{"id":1,"sessionId":"session-1","messageId":"message-1","rating":-1,"comment":"不够准确"}}""",
+                    """{"code":1,"data":{"id":1,"sessionId":"session-1","messageId":"message-1","rating":-1,"comment":"不够准确"}}""",
                 ),
         )
         server.start()
@@ -53,13 +53,13 @@ class ChatApiTest {
     fun `loads and deletes chat history endpoints`() {
         val server = MockWebServer()
         server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(
-            """{"code":0,"data":[{"sessionId":"session-1","title":"推荐耳机","createdAt":1000}]}""",
+            """{"code":1,"data":[{"sessionId":"session-1","title":"推荐耳机","createdAt":1000}]}""",
         ))
         server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(
-            """{"code":0,"data":[{"sessionId":"session-1","messageId":"message-1","content":"推荐耳机","messageType":"USER","createdAt":1000}]}""",
+            """{"code":1,"data":[{"sessionId":"session-1","messageId":"message-1","content":"推荐耳机","messageType":"USER","createdAt":1000}]}""",
         ))
         server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(
-            """{"code":0,"data":"deleted"}""",
+            """{"code":1,"data":"deleted"}""",
         ))
         server.start()
 
@@ -91,7 +91,7 @@ class ChatApiTest {
         server.enqueue(
             MockResponse()
                 .setHeader("Content-Type", "application/json")
-                .setBody("""{"code":0,"msg":"","data":"stopped"}"""),
+                .setBody("""{"code":1,"msg":"","data":"stopped"}"""),
         )
         server.start()
 
@@ -116,7 +116,7 @@ class ChatApiTest {
                 request.requestUrl?.encodedPath,
             )
             assertEquals("test-token", request.getHeader("token"))
-            assertEquals(0, result.code)
+            assertEquals(1, result.code)
             assertEquals("stopped", result.data)
         } finally {
             server.shutdown()

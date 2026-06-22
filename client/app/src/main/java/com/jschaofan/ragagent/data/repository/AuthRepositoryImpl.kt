@@ -33,7 +33,7 @@ class AuthRepositoryImpl(
     override suspend fun logout(): ApiResult<Unit> =
         runCatching { authApi.logout() }.fold(
             onSuccess = { response ->
-                if (response.code == 0 || !response.data.isNullOrBlank()) {
+                if (response.code == SUCCESS_CODE) {
                     ApiResult.Success(Unit)
                 } else {
                     ApiResult.Failure(response.msg.orEmpty().ifBlank { "退出登录失败" })
@@ -43,4 +43,8 @@ class AuthRepositoryImpl(
                 ApiResult.Failure(error.message ?: "退出登录失败", cause = error)
             },
         )
+
+    private companion object {
+        const val SUCCESS_CODE = 1
+    }
 }

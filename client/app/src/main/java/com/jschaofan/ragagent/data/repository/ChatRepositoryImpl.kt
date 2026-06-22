@@ -248,7 +248,7 @@ class ChatRepositoryImpl(
     )
 
     private companion object {
-        const val SUCCESS_CODE = 0
+        const val SUCCESS_CODE = 1
         const val HTTP_UNAUTHORIZED = 401
         const val HTTP_SERVER_ERROR_START = 500
         const val DEFAULT_SERVER_ERROR = "服务处理失败"

@@ -48,6 +48,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +73,7 @@ import com.jschaofan.ragagent.ui.product.model.ProductCardUiModel
 import com.jschaofan.ragagent.ui.product.model.toProductCards
 import com.jschaofan.ragagent.ui.theme.RAGGuideAgentTheme
 import java.io.File
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChatScreen(
@@ -196,15 +198,38 @@ private fun ChatScreenContent(
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    var autoFollowMessages by remember(uiState.sessionId) { mutableStateOf(true) }
+    val showScrollToBottom =
+        uiState.messages.isNotEmpty() &&
+            !uiState.isLoadingSession &&
+            listState.canScrollForward
 
-    // 消息内容持续增长时滚动到底部，让最新的流式文本始终可见。
+    // Entering or switching a session starts at its newest message.
+    LaunchedEffect(uiState.sessionId, uiState.isLoadingSession) {
+        if (!uiState.isLoadingSession && uiState.messages.isNotEmpty()) {
+            autoFollowMessages = true
+            listState.scrollToItem(uiState.messages.lastIndex)
+        }
+    }
+
+    // Pause immediately while scrolling, then resume only if scrolling ends at the bottom.
+    LaunchedEffect(listState.isScrollInProgress) {
+        autoFollowMessages = if (listState.isScrollInProgress) {
+            false
+        } else {
+            !listState.canScrollForward
+        }
+    }
+
+    // Stream updates follow the latest message until the user scrolls upward.
     LaunchedEffect(
         uiState.messages.lastOrNull()?.content,
         uiState.messages.lastOrNull()?.structuredResult,
         uiState.messages.size,
     ) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.lastIndex)
+        if (autoFollowMessages && uiState.messages.isNotEmpty()) {
+            listState.scrollToItem(uiState.messages.lastIndex)
         }
     }
 
@@ -269,29 +294,59 @@ private fun ChatScreenContent(
                 modifier = Modifier.padding(innerPadding),
             )
         } else {
-            LazyColumn(
-                state = listState,
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 16.dp,
-                    vertical = 20.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                items(
-                    items = uiState.messages,
-                    key = ChatMessage::id,
-                ) { message ->
-                    ChatMessageItem(
-                        message = message,
-                        onRetryClick = onRetryClick,
-                        evaluationState = uiState.evaluations[message.id],
-                        onEvaluate = onEvaluate,
-                        onProductClick = onProductClick,
-                        onAddToCart = onAddToCart,
-                    )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 16.dp,
+                        vertical = 20.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    items(
+                        items = uiState.messages,
+                        key = ChatMessage::id,
+                    ) { message ->
+                        ChatMessageItem(
+                            message = message,
+                            onRetryClick = onRetryClick,
+                            evaluationState = uiState.evaluations[message.id],
+                            onEvaluate = onEvaluate,
+                            onProductClick = onProductClick,
+                            onAddToCart = onAddToCart,
+                        )
+                    }
+                }
+                if (showScrollToBottom) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 14.dp)
+                            .size(46.dp)
+                            .clickable {
+                                autoFollowMessages = true
+                                coroutineScope.launch {
+                                    listState.animateScrollToItem(uiState.messages.lastIndex)
+                                }
+                            },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 6.dp,
+                        tonalElevation = 2.dp,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "↓",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
                 }
             }
         }

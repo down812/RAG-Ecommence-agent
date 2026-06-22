@@ -193,7 +193,7 @@ class ChatRepositoryImplTest {
 
     @Test
     fun `returns success or business failure when stopping message`() {
-        val successApi = FakeChatApi(ApiEnvelope(code = 0, data = "stopped"))
+        val successApi = FakeChatApi(ApiEnvelope(code = 1, data = "stopped"))
         val failureApi = FakeChatApi(ApiEnvelope(code = 4001, msg = "消息不存在"))
         val successRepository = createRepository(chatApi = successApi)
         val failureRepository = createRepository(chatApi = failureApi)
@@ -219,7 +219,7 @@ class ChatRepositoryImplTest {
     fun `uses a unique uuid generator by default`() {
         val repository = ChatRepositoryImpl(
             streamDataSource = RecordingStreamDataSource(flowOf(ChatStreamEvent.Done)),
-            chatApi = FakeChatApi(ApiEnvelope(code = 0)),
+            chatApi = FakeChatApi(ApiEnvelope(code = 1)),
         )
 
         val first = repository.createSessionId()
@@ -234,7 +234,7 @@ class ChatRepositoryImplTest {
         dataSource: RecordingStreamDataSource = RecordingStreamDataSource(
             flowOf(ChatStreamEvent.Done),
         ),
-        chatApi: ChatApi = FakeChatApi(ApiEnvelope(code = 0)),
+        chatApi: ChatApi = FakeChatApi(ApiEnvelope(code = 1)),
         ids: ArrayDeque<String> = ArrayDeque(listOf("request-default")),
     ): ChatRepositoryImpl {
         return ChatRepositoryImpl(
