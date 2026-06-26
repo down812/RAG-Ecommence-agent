@@ -32,6 +32,11 @@ class ProductListViewModel(private val api: ProductApi) : ViewModel() {
     fun onSearchKeywordChanged(value: String) =
         _state.update { it.copy(searchKeyword = value, error = null) }
 
+    fun searchKeyword(keyword: String) {
+        _state.update { it.copy(searchKeyword = keyword, error = null) }
+        search(keyword = keyword)
+    }
+
     fun loadAllProducts(page: Int = 1) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null, isSearchResult = false) }
@@ -56,16 +61,16 @@ class ProductListViewModel(private val api: ProductApi) : ViewModel() {
         }
     }
 
-    fun search(resetPage: Boolean = true) {
-        val keyword = _state.value.searchKeyword.trim()
-        if (keyword.isBlank()) return
+    fun search(resetPage: Boolean = true, keyword: String = _state.value.searchKeyword.trim()) {
+        val normalizedKeyword = keyword.trim()
+        if (normalizedKeyword.isBlank()) return
 
         val page = if (resetPage) 1 else _state.value.currentPage
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null, isSearchResult = true) }
             runCatching {
                 val result = api.searchProducts(
-                    keyword = keyword,
+                    keyword = normalizedKeyword,
                     pageNum = page,
                     pageSize = PAGE_SIZE,
                 ).data

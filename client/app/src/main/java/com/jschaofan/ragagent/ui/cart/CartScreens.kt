@@ -1,23 +1,23 @@
 package com.jschaofan.ragagent.ui.cart
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -30,11 +30,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +43,14 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import com.jschaofan.ragagent.domain.cart.model.CartItem
 import com.jschaofan.ragagent.domain.cart.model.CheckoutOrder
+import com.jschaofan.ragagent.ui.components.AppCard
+import com.jschaofan.ragagent.ui.components.AppCorners
+import com.jschaofan.ragagent.ui.components.AppPrimaryButton
+import com.jschaofan.ragagent.ui.components.AppSpacing
+import com.jschaofan.ragagent.ui.components.AppTone
+import com.jschaofan.ragagent.ui.components.EmptyState
+import com.jschaofan.ragagent.ui.components.PageHeader
+import com.jschaofan.ragagent.ui.components.StatusPill
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -65,13 +74,18 @@ fun CartScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            PageHeader("购物车", onBack) {
-                if (state.cart.items.isNotEmpty()) {
-                    TextButton(onClick = { showClearConfirmation = true }) { Text("清空") }
-                }
-            }
+            PageHeader(
+                title = "购物车",
+                onBack = onBack,
+                action = {
+                    if (state.cart.items.isNotEmpty()) {
+                        TextButton(onClick = { showClearConfirmation = true }) { Text("清空") }
+                    }
+                },
+            )
         },
         bottomBar = {
             if (state.cart.items.isNotEmpty()) {
@@ -84,9 +98,10 @@ fun CartScreen(
         },
     ) { padding ->
         if (state.cart.items.isEmpty()) {
-            EmptyPage(
+            EmptyState(
                 title = "购物车还是空的",
-                subtitle = "从推荐商品或详情页加入商品",
+                subtitle = "从推荐商品或详情页加入商品。",
+                icon = "□",
                 modifier = Modifier.padding(padding),
             )
         } else {
@@ -94,9 +109,10 @@ fun CartScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(AppSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
             ) {
+                item { AiRecommendationNotice() }
                 items(state.cart.items, key = CartItem::key) { item ->
                     CartItemCard(
                         item = item,
@@ -105,35 +121,33 @@ fun CartScreen(
                         onRemove = { itemToRemove = item },
                     )
                 }
+                item { DiscountNotice() }
             }
         }
     }
+
     itemToRemove?.let { item ->
-        AlertDialog(
-            onDismissRequest = { itemToRemove = null },
-            title = { Text("删除商品") },
-            text = { Text("确定从购物车删除“${item.productName}”吗？") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.remove(item.key)
-                    itemToRemove = null
-                }) { Text("删除") }
+        ConfirmDialog(
+            title = "删除商品",
+            text = "确定从购物车删除“${item.productName}”吗？",
+            confirmText = "删除",
+            onConfirm = {
+                viewModel.remove(item.key)
+                itemToRemove = null
             },
-            dismissButton = { TextButton(onClick = { itemToRemove = null }) { Text("取消") } },
+            onDismiss = { itemToRemove = null },
         )
     }
     if (showClearConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showClearConfirmation = false },
-            title = { Text("清空购物车") },
-            text = { Text("确定清空购物车中的全部商品吗？") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.clearCart()
-                    showClearConfirmation = false
-                }) { Text("清空") }
+        ConfirmDialog(
+            title = "清空购物车",
+            text = "确定清空购物车中的全部商品吗？",
+            confirmText = "清空",
+            onConfirm = {
+                viewModel.clearCart()
+                showClearConfirmation = false
             },
-            dismissButton = { TextButton(onClick = { showClearConfirmation = false }) { Text("取消") } },
+            onDismiss = { showClearConfirmation = false },
         )
     }
 }
@@ -152,38 +166,18 @@ fun CheckoutScreen(
     }
 
     Scaffold(
-        topBar = { PageHeader("确认订单", onBack) },
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { PageHeader("确认订单", subtitle = "当前为前端模拟下单流程", onBack = onBack) },
         bottomBar = {
             if (state.cart.items.isNotEmpty()) {
-                Surface(shadowElevation = 8.dp) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text("应付金额", style = MaterialTheme.typography.labelMedium)
-                            Text(
-                                state.cart.totalAmount.toPrice(),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                        Button(onClick = viewModel::submitOrder) {
-                            Text("确认下单")
-                        }
-                    }
-                }
+                CheckoutBottomBar(totalAmount = state.cart.totalAmount, onSubmit = viewModel::submitOrder)
             }
         },
     ) { padding ->
         if (state.cart.items.isEmpty()) {
-            EmptyPage(
+            EmptyState(
                 title = "没有可结算的商品",
-                subtitle = "请先返回购物车添加商品",
+                subtitle = "请先返回购物车添加商品。",
                 modifier = Modifier.padding(padding),
             )
         } else {
@@ -191,25 +185,23 @@ fun CheckoutScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(AppSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
             ) {
                 item {
-                    InfoCard(
-                        title = "收货地址",
-                        content = state.defaultAddress,
-                    )
+                    AppCard {
+                        Text("收货地址", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            state.defaultAddress,
+                            modifier = Modifier.padding(top = AppSpacing.xs),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 item {
-                    Text(
-                        "商品清单",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    Text("商品清单", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
-                items(state.cart.items, key = CartItem::key) { item ->
-                    CheckoutItem(item)
-                }
+                items(state.cart.items, key = CartItem::key) { item -> CheckoutItem(item) }
             }
         }
     }
@@ -224,59 +216,57 @@ fun OrderSuccessScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
-            .padding(28.dp),
+            .padding(AppSpacing.lg),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(
-                "下单成功",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text("订单号：${order.orderNumber}")
-            Text("共 ${order.items.sumOf(CartItem::quantity)} 件商品")
-            Text(
-                order.totalAmount.toPrice(),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "收货地址：${order.address}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Button(
-                onClick = onDone,
-                modifier = Modifier.padding(top = 12.dp),
+        AppCard(tonal = true, contentPadding = PaddingValues(AppSpacing.xxl)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
             ) {
-                Text("返回导购")
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("✓", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.secondary)
+                }
+                Text("下单成功", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("订单号：${order.orderNumber}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("共 ${order.items.sumOf(CartItem::quantity)} 件商品")
+                Text(order.totalAmount.toPrice(), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.tertiary)
+                AppPrimaryButton("返回导购", onClick = onDone, modifier = Modifier.fillMaxWidth())
             }
         }
     }
 }
 
 @Composable
-private fun PageHeader(
-    title: String,
-    onBack: () -> Unit,
-    action: (@Composable () -> Unit)? = null,
-) {
-    Surface(shadowElevation = 2.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) { Text("返回") }
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-            action?.invoke()
+private fun AiRecommendationNotice() {
+    AppCard(tonal = true) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("✦", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+            Column(modifier = Modifier.padding(start = AppSpacing.md)) {
+                Text("部分商品来自 AI 推荐", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("结算前请再次核对价格、规格和数量。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiscountNotice() {
+    AppCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StatusPill(text = "说明", tone = AppTone.Ai)
+            Text(
+                text = "商品价格可能随促销活动变化，请以结算页为准。",
+                modifier = Modifier.padding(start = AppSpacing.sm),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -288,36 +278,48 @@ private fun CartItemCard(
     onDecrease: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    Card {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+    AppCard(contentPadding = PaddingValues(AppSpacing.md)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+            Box(modifier = Modifier.align(Alignment.CenterVertically)) {
+                Surface(
+                    modifier = Modifier.size(24.dp),
+                    shape = AppCorners.small,
+                    color = MaterialTheme.colorScheme.primary,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("✓", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
             CartImage(item)
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    item.productName,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                item.specification?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        item.productName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = AppSpacing.xs)) {
+                        Text("删", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                item.specification?.takeIf(String::isNotBlank)?.let {
+                    StatusPill(text = it, tone = AppTone.Neutral)
                 }
                 Text(
                     item.unitPrice.toPrice(),
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.tertiary,
                     fontWeight = FontWeight.Bold,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDecrease) { Text("−") }
-                    Text("${item.quantity}")
-                    TextButton(onClick = onIncrease) { Text("+") }
-                    TextButton(onClick = onRemove) { Text("删除") }
-                }
+                QuantityStepper(
+                    quantity = item.quantity,
+                    onDecrease = onDecrease,
+                    onIncrease = onIncrease,
+                )
             }
         }
     }
@@ -325,103 +327,115 @@ private fun CartItemCard(
 
 @Composable
 private fun CartImage(item: CartItem) {
+    val modifier = Modifier
+        .size(112.dp)
+        .clip(AppCorners.medium)
+        .background(MaterialTheme.colorScheme.surfaceVariant)
     if (item.imageUrl.isNullOrBlank()) {
-        Box(
-            modifier = Modifier
-                .size(86.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text("暂无图片", style = MaterialTheme.typography.labelSmall)
         }
     } else {
         SubcomposeAsyncImage(
             model = item.imageUrl,
             contentDescription = item.productName,
-            modifier = Modifier.size(86.dp),
+            modifier = modifier,
             contentScale = ContentScale.Crop,
         )
     }
 }
 
 @Composable
-private fun CartBottomBar(
-    totalAmount: Double,
-    totalQuantity: Int,
-    onCheckout: () -> Unit,
-) {
-    Surface(shadowElevation = 8.dp) {
+private fun QuantityStepper(quantity: Int, onDecrease: () -> Unit, onIncrease: () -> Unit) {
+    Surface(
+        shape = AppCorners.small,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onDecrease, contentPadding = PaddingValues(horizontal = AppSpacing.sm)) { Text("−") }
+            Text("$quantity", modifier = Modifier.padding(horizontal = AppSpacing.md), fontWeight = FontWeight.Bold)
+            TextButton(onClick = onIncrease, contentPadding = PaddingValues(horizontal = AppSpacing.sm)) { Text("+") }
+        }
+    }
+}
+
+@Composable
+private fun CartBottomBar(totalAmount: Double, totalQuantity: Int, onCheckout: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .navigationBarsPadding()
+                .padding(AppSpacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column {
-                Text("共 $totalQuantity 件")
-                Text(
-                    totalAmount.toPrice(),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+            StatusPill(text = "全选", tone = AppTone.Primary)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("合计", style = MaterialTheme.typography.labelMedium)
+                Text(totalAmount.toPrice(), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.tertiary)
+                Text("共 $totalQuantity 件", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Button(onClick = onCheckout) { Text("去结算") }
+            AppPrimaryButton("去结算", onClick = onCheckout)
+        }
+    }
+}
+
+@Composable
+private fun CheckoutBottomBar(totalAmount: Double, onSubmit: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(AppSpacing.lg),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("应付金额", style = MaterialTheme.typography.labelMedium)
+                Text(totalAmount.toPrice(), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.tertiary)
+            }
+            AppPrimaryButton("确认下单", onClick = onSubmit)
         }
     }
 }
 
 @Composable
 private fun CheckoutItem(item: CartItem) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(item.productName, fontWeight = FontWeight.SemiBold)
-            item.specification?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("${item.unitPrice.toPrice()} × ${item.quantity}")
-                Text(item.subtotal.toPrice(), fontWeight = FontWeight.Bold)
-            }
+    AppCard {
+        Text(item.productName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        item.specification?.let {
+            Text(it, modifier = Modifier.padding(top = AppSpacing.xs), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        HorizontalDivider(modifier = Modifier.padding(vertical = AppSpacing.sm))
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Text("${item.unitPrice.toPrice()} × ${item.quantity}")
+            Text(item.subtotal.toPrice(), fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
-private fun InfoCard(title: String, content: String) {
-    Card {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(title, fontWeight = FontWeight.Bold)
-            HorizontalDivider()
-            Text(content)
-        }
-    }
-}
-
-@Composable
-private fun EmptyPage(
+private fun ConfirmDialog(
     title: String,
-    subtitle: String,
-    modifier: Modifier = Modifier,
+    text: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(
-                subtitle,
-                modifier = Modifier.padding(top = 8.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(text) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(confirmText, color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }
 
 private fun Double.toPrice(): String =

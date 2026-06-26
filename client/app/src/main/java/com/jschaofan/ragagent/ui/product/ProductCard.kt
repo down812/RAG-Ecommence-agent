@@ -33,6 +33,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import com.jschaofan.ragagent.core.network.toEncodedImageUrl
+import com.jschaofan.ragagent.ui.components.AppCorners
+import com.jschaofan.ragagent.ui.components.AppSpacing
+import com.jschaofan.ragagent.ui.components.StatusPill
 import com.jschaofan.ragagent.ui.product.model.ProductCardUiModel
 import com.jschaofan.ragagent.ui.theme.RAGGuideAgentTheme
 import java.text.NumberFormat
@@ -48,12 +51,27 @@ fun ProductCardList(
     if (products.isEmpty()) return
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = "为你找到 ${products.size} 件商品",
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 2.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "为你推荐",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "已根据当前需求筛选",
+                    modifier = Modifier.padding(top = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            StatusPill(text = "${products.size} 件推荐")
+        }
         LazyRow(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
                 start = 2.dp,
@@ -71,6 +89,7 @@ fun ProductCardList(
                     product = product,
                     onClick = { onProductClick(product) },
                     onAddToCart = { onAddToCart(product) },
+                    modifier = Modifier.width(252.dp),
                 )
             }
         }
@@ -86,13 +105,12 @@ fun ProductCard(
 ) {
     Card(
         modifier = modifier
-            .width(244.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = AppCorners.large,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column {
             ProductImage(
@@ -100,21 +118,11 @@ fun ProductCard(
                 contentDescription = product.name,
             )
             Column(
-                modifier = Modifier.padding(15.dp),
-                verticalArrangement = Arrangement.spacedBy(7.dp),
+                modifier = Modifier.padding(AppSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
             ) {
                 product.badge?.let { badge ->
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(6.dp),
-                    ) {
-                        Text(
-                            text = badge,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
+                    StatusPill(text = badge)
                 }
                 Text(
                     text = product.name,
@@ -126,18 +134,32 @@ fun ProductCard(
                 ProductMetadata(product)
                 Text(
                     text = product.price.toPriceText(),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.tertiary,
                 )
                 product.description?.let { description ->
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = AppCorners.small,
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            Text(
+                                text = "推荐依据",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = description,
+                                modifier = Modifier.padding(top = 3.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
                 ProductTags(tags = product.tags)
                 product.salesCount?.let { salesCount ->
@@ -152,7 +174,11 @@ fun ProductCard(
                         onClick = onAddToCart,
                         enabled = product.price != null,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = AppCorners.medium,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary,
+                            contentColor = MaterialTheme.colorScheme.onTertiary,
+                        ),
                     ) {
                         Text(if (product.price == null) "价格待确认" else "加入购物车")
                     }
@@ -176,8 +202,8 @@ private fun ProductImage(
 ) {
     val imageModifier = Modifier
         .fillMaxWidth()
-        .aspectRatio(4f / 3f)
-        .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+        .aspectRatio(1.18f)
+        .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
 
     if (imageUrl.isNullOrBlank()) {
         ProductImagePlaceholder(

@@ -38,6 +38,10 @@ import coil3.compose.SubcomposeAsyncImage
 import com.jschaofan.ragagent.core.network.toEncodedImageUrl
 import com.jschaofan.ragagent.domain.product.model.ProductDetail
 import com.jschaofan.ragagent.domain.product.model.ProductSku
+import com.jschaofan.ragagent.ui.components.AppCorners
+import com.jschaofan.ragagent.ui.components.AppSpacing
+import com.jschaofan.ragagent.ui.components.PageHeader
+import com.jschaofan.ragagent.ui.components.StatusPill
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -55,12 +59,22 @@ fun ProductDetailScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             ProductDetailHeader(
                 onBack = onBack,
                 cartItemCount = cartItemCount,
                 onCartClick = onCartClick,
             )
+        },
+        bottomBar = {
+            uiState.product?.let { product ->
+                ProductDetailBottomBar(
+                    product = product,
+                    onCartClick = onCartClick,
+                    onAddToCart = onAddToCart,
+                )
+            }
         },
     ) { innerPadding ->
         when {
@@ -97,28 +111,16 @@ private fun ProductDetailHeader(
     cartItemCount: Int,
     onCartClick: () -> Unit,
 ) {
-    Surface(shadowElevation = 2.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) {
-                Text("返回")
+    PageHeader(
+        title = "商品详情",
+        subtitle = "真实商品信息",
+        onBack = onBack,
+        action = {
+            Surface(onClick = onCartClick, shape = AppCorners.small) {
+                StatusPill(text = if (cartItemCount > 0) "购物车 $cartItemCount" else "购物车")
             }
-            Text(
-                text = "商品详情",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
-            TextButton(onClick = onCartClick) {
-                Text(if (cartItemCount > 0) "购物车($cartItemCount)" else "购物车")
-            }
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -200,13 +202,6 @@ private fun ProductDetailContent(
                         text = "暂无可选规格",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Button(
-                        onClick = { onAddToCart(product, null) },
-                        enabled = product.isOnSale && product.basePrice != null,
-                        modifier = Modifier.padding(top = 10.dp),
-                    ) {
-                        Text("加入购物车")
-                    }
                 }
             }
         } else {
@@ -230,7 +225,7 @@ private fun DetailProductImage(
 ) {
     val modifier = Modifier
         .fillMaxWidth()
-        .aspectRatio(1.25f)
+        .aspectRatio(1.08f)
 
     if (imageUrl.isNullOrBlank()) {
         DetailImagePlaceholder("暂无商品图片", modifier)
@@ -282,10 +277,10 @@ private fun ProductSummary(product: ProductDetail) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        shape = RoundedCornerShape(20.dp),
+            .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.sm),
+        shape = AppCorners.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
       Column(
         modifier = Modifier.padding(18.dp),
@@ -313,7 +308,7 @@ private fun ProductSummary(product: ProductDetail) {
             text = product.basePrice.toPriceText(),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.tertiary,
         )
         val category = listOfNotNull(
             product.category?.takeIf(String::isNotBlank),
@@ -326,7 +321,7 @@ private fun ProductSummary(product: ProductDetail) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (false && product.productCode.isNotBlank()) {
+        if (product.productCode.isNotBlank()) {
             Text(
                 text = "商品编码：${product.productCode}",
                 style = MaterialTheme.typography.labelMedium,
@@ -410,10 +405,10 @@ private fun SkuCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(18.dp),
+            .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.xs),
+        shape = AppCorners.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -429,7 +424,7 @@ private fun SkuCard(
                         text = sku.price.toPriceText(),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.tertiary,
                     )
                     if (
                         sku.originalPrice != null &&
@@ -478,20 +473,58 @@ private fun SkuCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (false && sku.skuCode.isNotBlank()) {
+            if (sku.skuCode.isNotBlank()) {
                 Text(
                     text = "SKU：${sku.skuCode}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Text(
+                text = if (sku.isAvailable) "可加入购物车" else "暂不可售",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (sku.isAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductDetailBottomBar(
+    product: ProductDetail,
+    onCartClick: () -> Unit,
+    onAddToCart: (ProductDetail, ProductSku?) -> Unit,
+) {
+    val sku = product.skus.firstOrNull { it.isAvailable && it.price != null }
+    Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.md),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Button(
-                onClick = onAddToCart,
-                enabled = sku.isAvailable && sku.price != null,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                onClick = addClick@{
+                    if (!product.isOnSale) return@addClick
+                    onAddToCart(product, sku)
+                },
+                enabled = product.isOnSale && (product.skus.isEmpty() || sku != null),
+                modifier = Modifier.weight(1f),
+                shape = AppCorners.medium,
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ),
             ) {
-                Text(if (sku.isAvailable) "加入购物车" else "暂不可售")
+                Text("加入购物车")
+            }
+            Button(
+                onClick = onCartClick,
+                modifier = Modifier.weight(1f),
+                shape = AppCorners.medium,
+            ) {
+                Text("查看购物车")
             }
         }
     }

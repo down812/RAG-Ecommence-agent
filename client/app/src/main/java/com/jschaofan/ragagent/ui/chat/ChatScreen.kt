@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -36,6 +37,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -56,7 +58,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
@@ -71,8 +73,18 @@ import com.jschaofan.ragagent.ui.chat.media.CameraCaptureTarget
 import com.jschaofan.ragagent.ui.product.ProductCardList
 import com.jschaofan.ragagent.ui.product.model.ProductCardUiModel
 import com.jschaofan.ragagent.ui.product.model.toProductCards
+import com.jschaofan.ragagent.ui.components.AppCard
+import com.jschaofan.ragagent.ui.components.AppCorners
+import com.jschaofan.ragagent.ui.components.AppPrimaryButton
+import com.jschaofan.ragagent.ui.components.AppSpacing
+import com.jschaofan.ragagent.ui.components.AppTone
+import com.jschaofan.ragagent.ui.components.EmptyState
+import com.jschaofan.ragagent.ui.components.StatusPill
 import com.jschaofan.ragagent.ui.theme.RAGGuideAgentTheme
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
@@ -87,6 +99,7 @@ fun ChatScreen(
     onProductsClick: () -> Unit = {},
     onAdminClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onBackClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -113,6 +126,10 @@ fun ChatScreen(
         cameraTarget = null
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.refreshSessions()
+    }
+
     ChatScreenContent(
         isAdmin = isAdmin,
         uiState = uiState,
@@ -128,6 +145,7 @@ fun ChatScreen(
         onProductsClick = onProductsClick,
         onAdminClick = onAdminClick,
         onLogoutClick = onLogoutClick,
+        onBackClick = onBackClick,
         onHistoryClick = {
             historyOpen = true
             viewModel.refreshSessions()
@@ -189,6 +207,7 @@ private fun ChatScreenContent(
     onProductsClick: () -> Unit,
     onAdminClick: () -> Unit,
     onLogoutClick: () -> Unit,
+    onBackClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onGalleryClick: () -> Unit,
     onCameraClick: () -> Unit,
@@ -252,6 +271,7 @@ private fun ChatScreenContent(
                 onProductsClick = onProductsClick,
                 onAdminClick = onAdminClick,
                 onLogoutClick = onLogoutClick,
+                onBackClick = onBackClick,
                 onHistoryClick = onHistoryClick,
                 historyEnabled = !uiState.isGenerating && !uiState.isLoadingSession,
             )
@@ -279,13 +299,32 @@ private fun ChatScreenContent(
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Text(
-                        text = "正在加载会话",
-                        modifier = Modifier.padding(top = 12.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(20.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 3.dp,
+                        )
+                        Column(modifier = Modifier.padding(start = 14.dp)) {
+                            Text(
+                                text = "正在打开会话",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = "正在取回之前的消息",
+                                modifier = Modifier.padding(top = 2.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
         } else if (uiState.messages.isEmpty()) {
@@ -303,10 +342,10 @@ private fun ChatScreenContent(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        horizontal = 16.dp,
-                        vertical = 20.dp,
+                        horizontal = 14.dp,
+                        vertical = 18.dp,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     items(
                         items = uiState.messages,
@@ -361,56 +400,58 @@ private fun ChatHeader(
     onProductsClick: () -> Unit,
     onAdminClick: () -> Unit,
     onLogoutClick: () -> Unit,
+    onBackClick: () -> Unit,
     onHistoryClick: () -> Unit,
     historyEnabled: Boolean,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 1.dp,
+        color = MaterialTheme.colorScheme.background,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 12.dp),
+                .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
+            TextButton(
+                onClick = onBackClick,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp),
+            ) {
+                Text("‹", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
+            }
+            Column(
                 modifier = Modifier
-                    .size(36.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape),
-                contentAlignment = Alignment.Center,
+                    .weight(1f)
+                    .padding(start = AppSpacing.xs),
             ) {
                 Text(
-                    text = "AI",
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    text = "AI导购",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
-            }
-            Column(modifier = Modifier.padding(start = 12.dp)) {
                 Text(
-                    text = "智能导购助手",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "描述需求，我来帮你挑选商品",
+                    text = "智能购物助手",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(modifier = Modifier.weight(1f))
-            TextButton(
+            HeaderAction(
+                label = "◷",
                 onClick = onHistoryClick,
                 enabled = historyEnabled,
-            ) {
-                Text("历史")
-            }
+            )
+            HeaderAction(
+                label = if (cartItemCount > 0) "车$cartItemCount" else "车",
+                onClick = onCartClick,
+            )
             Box {
-                TextButton(onClick = { menuExpanded = true }) {
-                    Text(if (cartItemCount > 0) "功能 ($cartItemCount)" else "功能")
-                }
+                HeaderAction(label = "更多", onClick = { menuExpanded = true })
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
@@ -438,18 +479,20 @@ private fun ChatHeader(
                             },
                         )
                     }
-                    DropdownMenuItem(
-                        text = {
-                            Text(if (cartItemCount > 0) "购物车 ($cartItemCount)" else "购物车")
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onCartClick()
-                        },
-                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HeaderAction(
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    TextButton(onClick = onClick, enabled = enabled) {
+        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -462,9 +505,10 @@ private fun ChatHistoryDialog(
     onSessionClick: (String) -> Unit,
     onDeleteSession: (String) -> Unit,
 ) {
+    var pendingDeleteSessionId by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("历史会话") },
+        title = { Text("AI 咨询历史", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -472,12 +516,7 @@ private fun ChatHistoryDialog(
                     .heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Button(
-                    onClick = onNewSession,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("新建对话")
-                }
+                AppPrimaryButton("新建对话", onClick = onNewSession, modifier = Modifier.fillMaxWidth())
                 HorizontalDivider()
                 when {
                     uiState.isLoadingSessions -> Box(
@@ -487,46 +526,95 @@ private fun ChatHistoryDialog(
                         CircularProgressIndicator(modifier = Modifier.size(28.dp))
                     }
                     uiState.sessions.isEmpty() -> Text(
-                        text = "暂无历史会话",
-                        modifier = Modifier.padding(vertical = 20.dp),
+                        text = "还没有历史会话\n开始提问后，会话会保存在这里",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 28.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        items(uiState.sessions, key = { it.sessionId }) { session ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onSessionClick(session.sessionId) }
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                    else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(
+                            items = uiState.sessions.sortedByDescending {
+                                it.createdAtEpochMillis ?: 0L
+                            },
+                            key = { it.sessionId },
+                        ) { session ->
+                            val isCurrentSession = session.sessionId == uiState.sessionId
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = if (isCurrentSession) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                },
+                                shape = AppCorners.medium,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outlineVariant,
+                                ),
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = session.title?.takeIf(String::isNotBlank) ?: "未命名会话",
-                                        maxLines = 2,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (session.sessionId == uiState.sessionId) {
-                                            FontWeight.Bold
-                                        } else {
-                                            FontWeight.Normal
-                                        },
-                                    )
-                                    if (session.sessionId == uiState.sessionId) {
-                                        Text(
-                                            text = "当前会话",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
-                                }
-                                TextButton(
-                                    onClick = { onDeleteSession(session.sessionId) },
-                                    enabled = uiState.deletingSessionId == null,
+                                Row(
+                                    modifier = Modifier
+                                        .clickable { onSessionClick(session.sessionId) }
+                                        .padding(start = 14.dp, top = 12.dp, bottom = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    if (uiState.deletingSessionId == session.sessionId) {
-                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    } else {
-                                        Text("删除")
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(MaterialTheme.colorScheme.primaryContainer, AppCorners.medium),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text("AI", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                    }
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(start = AppSpacing.sm),
+                                    ) {
+                                        Text(
+                                            text = session.title?.takeIf(String::isNotBlank)
+                                                ?: "未命名会话",
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isCurrentSession) {
+                                                FontWeight.SemiBold
+                                            } else {
+                                                FontWeight.Normal
+                                            },
+                                        )
+                                        Row(
+                                            modifier = Modifier.padding(top = 5.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            Text(
+                                                text = formatSessionTime(session.createdAtEpochMillis),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            if (isCurrentSession) {
+                                                StatusPill(text = "当前", tone = AppTone.Primary)
+                                            }
+                                        }
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            pendingDeleteSessionId = session.sessionId
+                                        },
+                                        enabled = uiState.deletingSessionId == null,
+                                    ) {
+                                        if (uiState.deletingSessionId == session.sessionId) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                strokeWidth = 2.dp,
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "删除",
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -544,6 +632,34 @@ private fun ChatHistoryDialog(
             }
         },
     )
+
+    pendingDeleteSessionId?.let { sessionId ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteSessionId = null },
+            title = { Text("删除这段会话？") },
+            text = { Text("删除后无法恢复，会话中的消息也会一并移除。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteSession(sessionId)
+                        pendingDeleteSessionId = null
+                    },
+                ) {
+                    Text("确认删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteSessionId = null }) {
+                    Text("取消")
+                }
+            },
+        )
+    }
+}
+
+private fun formatSessionTime(timestamp: Long?): String {
+    if (timestamp == null || timestamp <= 0L) return "时间未知"
+    return SimpleDateFormat("MM月dd日 HH:mm", Locale.CHINA).format(Date(timestamp))
 }
 
 @Composable
@@ -551,46 +667,57 @@ private fun EmptyChatContent(
     onSuggestionClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 28.dp, vertical = 24.dp),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = AppSpacing.lg),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = AppSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = CircleShape,
-            ) {
-                Text(
-                    text = "AI",
-                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 12.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
+        item {
+            AppCard(tonal = true, contentPadding = androidx.compose.foundation.layout.PaddingValues(AppSpacing.lg)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("AI", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                    Column(modifier = Modifier.padding(start = AppSpacing.md)) {
+                        Text(
+                            text = "今天想买点什么？",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "说说预算、用途和偏好，我来帮你挑选商品。",
+                            modifier = Modifier.padding(top = AppSpacing.xs),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                AppPrimaryButton(
+                    text = "输入需求开始咨询",
+                    onClick = { onSuggestionClick("想买一部3000元左右的手机，电池续航要好一点，适合学生用") },
+                    modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.md),
                 )
             }
-            Text(
-                text = "今天想买点什么？",
-                modifier = Modifier.padding(top = 18.dp),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "可以告诉我预算、使用场景或偏好的品牌",
-                modifier = Modifier.padding(top = 10.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
+        }
+
+        item {
+            Text("试试这样问", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             LazyRow(
-                modifier = Modifier.padding(top = 22.dp),
+                modifier = Modifier.padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(QUICK_QUESTIONS) { question ->
                     Surface(
                         modifier = Modifier.clickable { onSuggestionClick(question) },
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(20.dp),
+                        shape = AppCorners.pill,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
                             MaterialTheme.colorScheme.outlineVariant,
@@ -604,9 +731,10 @@ private fun EmptyChatContent(
                     }
                 }
             }
-            }
         }
+
     }
+}
 
 @Composable
 private fun ChatMessageItem(
@@ -619,33 +747,20 @@ private fun ChatMessageItem(
     modifier: Modifier = Modifier,
 ) {
     val isUser = message.sender == MessageSender.USER
-    val bubbleColor = if (isUser) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val contentColor = if (isUser) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-    ) {
+    if (isUser) {
         Column(
-            modifier = Modifier.widthIn(max = 320.dp),
-            horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+            modifier = modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.End,
         ) {
             Surface(
-                color = bubbleColor,
-                contentColor = contentColor,
+                modifier = Modifier.widthIn(max = 300.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 shape = RoundedCornerShape(
-                    topStart = 18.dp,
-                    topEnd = 18.dp,
-                    bottomStart = if (isUser) 18.dp else 4.dp,
-                    bottomEnd = if (isUser) 4.dp else 18.dp,
+                    topStart = 24.dp,
+                    topEnd = 24.dp,
+                    bottomStart = 24.dp,
+                    bottomEnd = 8.dp,
                 ),
             ) {
                 MessageContent(
@@ -658,12 +773,65 @@ private fun ChatMessageItem(
                 message = message,
                 onRetryClick = onRetryClick,
             )
-            if (message.sender == MessageSender.ASSISTANT && message.status == MessageStatus.COMPLETED) {
-                MessageEvaluationActions(
-                    messageId = message.id,
-                    state = evaluationState,
-                    onEvaluate = onEvaluate,
+        }
+    } else {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Surface(
+                modifier = Modifier.size(34.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.primary,
+                shape = CircleShape,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "AI",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 10.dp),
+            ) {
+                Text(
+                    text = "导购助手",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
                 )
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 5.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(8.dp, 22.dp, 22.dp, 22.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant,
+                    ),
+                ) {
+                    MessageContent(
+                        message = message,
+                        onProductClick = onProductClick,
+                        onAddToCart = onAddToCart,
+                    )
+                }
+                MessageStatus(
+                    message = message,
+                    onRetryClick = onRetryClick,
+                )
+                if (message.status == MessageStatus.COMPLETED) {
+                    MessageEvaluationActions(
+                        messageId = message.id,
+                        state = evaluationState,
+                        onEvaluate = onEvaluate,
+                    )
+                }
             }
         }
     }
@@ -677,7 +845,15 @@ private fun MessageEvaluationActions(
 ) {
     var feedbackOpen by remember(messageId) { mutableStateOf(false) }
     var comment by remember(messageId) { mutableStateOf(state?.comment.orEmpty()) }
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier.padding(top = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (state?.rating == null) "这条建议有帮助吗？" else "感谢你的反馈",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         TextButton(
             onClick = { onEvaluate(messageId, RATING_LIKE, null) },
             enabled = state?.isSubmitting != true,
@@ -688,11 +864,11 @@ private fun MessageEvaluationActions(
             onClick = { feedbackOpen = true },
             enabled = state?.isSubmitting != true,
         ) {
-            Text(if (state?.rating == RATING_DISLIKE) "已反馈" else "没帮助")
+            Text(if (state?.rating == RATING_DISLIKE) "已反馈" else "需改进")
         }
         if (state?.isSubmitting == true) {
             CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(14.dp),
                 strokeWidth = 2.dp,
             )
         }
@@ -718,7 +894,7 @@ private fun MessageEvaluationActions(
                         onEvaluate(messageId, RATING_DISLIKE, comment)
                         feedbackOpen = false
                     },
-                ) { Text("提交") }
+                ) { Text("提交反馈") }
             },
             dismissButton = {
                 TextButton(onClick = { feedbackOpen = false }) { Text("取消") }
@@ -789,32 +965,51 @@ private fun MessageStatus(
     message: ChatMessage,
     onRetryClick: (String) -> Unit,
 ) {
-    val statusText = when (message.status) {
-        MessageStatus.FAILED -> message.error?.message ?: "回复失败"
-        MessageStatus.STOPPED -> "已停止生成"
-        else -> null
-    }
-
-    statusText?.let { text ->
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+    when (message.status) {
+        MessageStatus.FAILED -> Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            color = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            shape = RoundedCornerShape(12.dp),
         ) {
-            Text(
-                text = text,
-                modifier = Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (message.status == MessageStatus.FAILED) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-            if (message.status == MessageStatus.FAILED && message.error?.retryable == true) {
-                TextButton(onClick = { onRetryClick(message.id) }) {
-                    Text("重试")
+            Row(
+                modifier = Modifier.padding(start = 12.dp, top = 9.dp, bottom = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "这条回复没有完成",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = message.error?.message ?: "服务暂时不可用，请稍后再试",
+                        modifier = Modifier.padding(top = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                if (message.error?.retryable == true) {
+                    TextButton(onClick = { onRetryClick(message.id) }) {
+                        Text("重新生成")
+                    }
                 }
             }
         }
+        MessageStatus.STOPPED -> Surface(
+            modifier = Modifier.padding(top = 6.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(10.dp),
+        ) {
+            Text(
+                text = "生成已停止，可以修改需求后重新发送",
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        else -> Unit
     }
 }
 
@@ -834,14 +1029,30 @@ private fun ChatInputBar(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 4.dp,
+        shadowElevation = 8.dp,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding(),
         ) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            if (isGenerating) {
+                Row(
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Text(
+                        text = "导购助手正在整理回复，可随时停止",
+                        modifier = Modifier.padding(start = 8.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             if (selectedImages.isNotEmpty() || isPreparingImage) {
                 ImagePreviewRow(
                     images = selectedImages,
@@ -850,22 +1061,22 @@ private fun ChatInputBar(
                 )
             }
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.xxs),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs),
             ) {
                 TextButton(
                     onClick = onGalleryClick,
                     enabled = !isGenerating && !isPreparingImage &&
                         selectedImages.size < MAX_IMAGE_COUNT,
                 ) {
-                    Text("＋  添加图片")
+                    Text("▧ 图片")
                 }
                 TextButton(
                     onClick = onCameraClick,
                     enabled = !isGenerating && !isPreparingImage &&
                         selectedImages.size < MAX_IMAGE_COUNT,
                 ) {
-                    Text("◉  拍照识别")
+                    Text("◉ 拍照")
                 }
                 if (selectedImages.isNotEmpty()) {
                     Text(
@@ -877,7 +1088,12 @@ private fun ChatInputBar(
                 }
             }
             Row(
-                modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 12.dp),
+                modifier = Modifier.padding(
+                    start = AppSpacing.md,
+                    end = AppSpacing.md,
+                    top = AppSpacing.xxs,
+                    bottom = AppSpacing.md,
+                ),
                 verticalAlignment = Alignment.Bottom,
             ) {
                 OutlinedTextField(
@@ -887,7 +1103,13 @@ private fun ChatInputBar(
                     placeholder = { Text("输入你的购物需求") },
                     minLines = 1,
                     maxLines = 4,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = AppCorners.large,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.background,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(
                         onSend = {
@@ -897,9 +1119,15 @@ private fun ChatInputBar(
                 )
                 Spacer(modifier = Modifier.size(10.dp))
                 if (isGenerating) {
-                    TextButton(
+                    Button(
                         onClick = onStopClick,
-                        modifier = Modifier.padding(bottom = 4.dp),
+                        modifier = Modifier
+                            .heightIn(min = 52.dp)
+                            .padding(bottom = 1.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
                     ) {
                         Text("停止")
                     }
@@ -907,12 +1135,14 @@ private fun ChatInputBar(
                     Button(
                         onClick = onSendClick,
                         enabled = canSend,
-                        modifier = Modifier.padding(bottom = 4.dp),
+                        modifier = Modifier
+                            .heightIn(min = 52.dp)
+                            .padding(bottom = 1.dp),
                         colors = ButtonDefaults.buttonColors(
                             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         ),
                     ) {
-                        Text("发送")
+                        Text("➤")
                     }
                 }
             }
@@ -971,17 +1201,18 @@ private fun ImagePreviewRow(
                         ),
                 )
                 Text(
-                    text = "删除",
+                    text = "×",
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .background(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            shape = CircleShape,
                         )
                         .clickable { onRemoveImage(image.id) }
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
@@ -1052,6 +1283,7 @@ private fun ChatScreenPreview() {
             onProductsClick = {},
             onAdminClick = {},
             onLogoutClick = {},
+            onBackClick = {},
             onHistoryClick = {},
             onGalleryClick = {},
             onCameraClick = {},

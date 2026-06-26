@@ -29,6 +29,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.jschaofan.ragagent.ui.components.AppCorners
+import com.jschaofan.ragagent.ui.components.AppSpacing
 
 @Composable
 fun LoginScreen(
@@ -42,46 +44,50 @@ fun LoginScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = AppSpacing.xl, vertical = AppSpacing.xxl),
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            shadowElevation = 3.dp,
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(
-                modifier = Modifier.padding(28.dp),
-                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(top = 56.dp),
             ) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = AppCorners.medium,
                 ) {
                     Text(
-                        text = "AI",
+                        text = "AI SHOPPING COPILOT",
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge,
                     )
                 }
                 Text(
-                    text = "智能导购助手",
-                    modifier = Modifier.padding(top = 18.dp),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
+                    text = "懂需求，也懂商品",
+                    modifier = Modifier.padding(top = AppSpacing.xl),
+                    style = MaterialTheme.typography.displaySmall,
                 )
                 Text(
-                    text = "登录后开始你的购物咨询",
-                    modifier = Modifier.padding(top = 8.dp),
+                    text = "描述预算、场景或上传图片，\n找到真正适合你的选择。",
+                    modifier = Modifier.padding(top = AppSpacing.sm),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyLarge,
                 )
-                Spacer(modifier = Modifier.height(28.dp))
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, AppCorners.large)
+                    .padding(AppSpacing.lg),
+            ) {
                 OutlinedTextField(
                     value = state.identifier,
                     onValueChange = viewModel::onIdentifierChanged,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("账号") },
+                    shape = AppCorners.medium,
                     singleLine = true,
                     enabled = !state.isLoading,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -89,8 +95,9 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = state.password,
                     onValueChange = viewModel::onPasswordChanged,
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.sm),
                     label = { Text("密码") },
+                    shape = AppCorners.medium,
                     singleLine = true,
                     enabled = !state.isLoading,
                     visualTransformation = PasswordVisualTransformation(),
@@ -112,11 +119,11 @@ fun LoginScreen(
                 }
                 Button(
                     onClick = { viewModel.login(onLoginSuccess) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp).height(50.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.lg).height(54.dp),
                     enabled = state.identifier.isNotBlank() &&
                         state.password.isNotBlank() &&
                         !state.isLoading,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = AppCorners.medium,
                 ) {
                     if (state.isLoading) {
                         CircularProgressIndicator(

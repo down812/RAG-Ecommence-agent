@@ -40,6 +40,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.jschaofan.ragagent.data.remote.dto.SubaccountDto
 import com.jschaofan.ragagent.data.remote.dto.DatasetFileDto
+import com.jschaofan.ragagent.ui.components.AppCard
+import com.jschaofan.ragagent.ui.components.AppCorners
+import com.jschaofan.ragagent.ui.components.AppPrimaryButton
+import com.jschaofan.ragagent.ui.components.AppSpacing
+import com.jschaofan.ragagent.ui.components.AppTone
+import com.jschaofan.ragagent.ui.components.EmptyState
+import com.jschaofan.ragagent.ui.components.MetricTile
+import com.jschaofan.ragagent.ui.components.PageHeader
+import com.jschaofan.ragagent.ui.components.StatusPill
 
 private enum class AdminPage { HOME, USERS, PRODUCTS, DATASETS, EVALUATIONS }
 
@@ -54,9 +63,13 @@ fun AdminScreen(
     var page by remember { mutableStateOf(AdminPage.HOME) }
     val goBack = { if (page == AdminPage.HOME) onBack() else page = AdminPage.HOME }
     BackHandler(onBack = goBack)
-    Scaffold(topBar = { AdminHeader(page.title(), goBack) }) { padding ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { PageHeader(page.title(), subtitle = "运营工作台", onBack = goBack) },
+    ) { padding ->
         when (page) {
             AdminPage.HOME -> AdminHome(
+                state = state,
                 modifier = Modifier.padding(padding),
                 onUsers = { page = AdminPage.USERS },
                 onProducts = { page = AdminPage.PRODUCTS },
@@ -78,43 +91,60 @@ fun AdminScreen(
 }
 
 @Composable
-private fun AdminHeader(title: String, onBack: () -> Unit) {
-    Surface(shadowElevation = 1.dp) {
-        Row(
-            Modifier.fillMaxWidth().statusBarsPadding().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) { Text("返回") }
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
 private fun AdminHome(
+    state: AdminUiState,
     modifier: Modifier,
     onUsers: () -> Unit,
     onProducts: () -> Unit,
     onDatasets: () -> Unit,
     onEvaluations: () -> Unit,
 ) {
-    Column(
-        modifier.fillMaxSize().padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+    LazyColumn(
+        modifier.fillMaxSize(),
+        contentPadding = PaddingValues(AppSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
     ) {
-        ManagementEntry("用户管理", "创建、修改和删除子账号", onUsers)
-        ManagementEntry("商品管理", "新建、编辑、上下架商品与 SKU", onProducts)
-        ManagementEntry("知识库管理", "管理数据集、启停状态和上传文件", onDatasets)
-        ManagementEntry("评价管理", "查看好评、差评和用户反馈", onEvaluations)
+        item {
+            AppCard(tonal = true) {
+                Text("管理中心", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "维护商品事实、AI 知识库、用户权限与导购反馈。",
+                    modifier = Modifier.padding(top = AppSpacing.xs),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                MetricTile("商品", state.products.size.toString(), Modifier.weight(1f), AppTone.Primary, "▣")
+                MetricTile("知识库", state.datasets.size.toString(), Modifier.weight(1f), AppTone.Ai, "▤")
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                MetricTile("用户", state.users.size.toString(), Modifier.weight(1f), AppTone.Success, "●")
+                MetricTile("评价", state.evaluations.size.toString(), Modifier.weight(1f), AppTone.Warning, "★")
+            }
+        }
+        item { ManagementEntry("用户管理", "创建、修改和删除子账号", "●", AppTone.Success, onUsers) }
+        item { ManagementEntry("商品管理", "新建、编辑、上下架商品与 SKU", "▣", AppTone.Primary, onProducts) }
+        item { ManagementEntry("知识库管理", "管理数据集、启停状态和上传文件", "▤", AppTone.Ai, onDatasets) }
+        item { ManagementEntry("评价管理", "查看有帮助/没帮助反馈", "★", AppTone.Warning, onEvaluations) }
     }
 }
 
 @Composable
-private fun ManagementEntry(title: String, subtitle: String, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(18.dp)) {
-        Column(Modifier.padding(18.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(subtitle, modifier = Modifier.padding(top = 6.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun ManagementEntry(title: String, subtitle: String, icon: String, tone: AppTone, onClick: () -> Unit) {
+    AppCard(modifier = Modifier.clickable(onClick = onClick)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            StatusPill(text = icon, tone = tone)
+            Column(Modifier.weight(1f).padding(horizontal = AppSpacing.sm)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
+            Text("›", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -131,28 +161,32 @@ private fun UserManagementScreen(
     var deletingUser by remember { mutableStateOf<SubaccountDto?>(null) }
     LazyColumn(
         modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(AppSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
     ) {
         item {
-            Card {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("新增用户", fontWeight = FontWeight.Bold)
-                    OutlinedTextField(state.identifier, viewModel::onIdentifierChanged, Modifier.fillMaxWidth(), label = { Text("账号") })
-                    OutlinedTextField(
-                        state.password,
-                        viewModel::onPasswordChanged,
-                        Modifier.fillMaxWidth(),
-                        label = { Text("密码") },
-                        visualTransformation = PasswordVisualTransformation(),
-                    )
-                    RoleSelector(
-                        selected = state.userType,
-                        options = listOf(0, 1, 2),
-                        onSelected = viewModel::onUserTypeChanged,
-                    )
-                    Button(viewModel::createUser, enabled = !state.isLoading) { Text("创建用户") }
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                MetricTile("用户总数", state.users.size.toString(), Modifier.weight(1f), AppTone.Primary, "●")
+                MetricTile("管理员", state.users.count { it.type in setOf(0, 1) }.toString(), Modifier.weight(1f), AppTone.Ai, "♛")
+            }
+        }
+        item {
+            AppCard {
+                Text("新增用户", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                OutlinedTextField(state.identifier, viewModel::onIdentifierChanged, Modifier.fillMaxWidth().padding(top = AppSpacing.sm), label = { Text("账号") })
+                OutlinedTextField(
+                    state.password,
+                    viewModel::onPasswordChanged,
+                    Modifier.fillMaxWidth().padding(top = AppSpacing.xs),
+                    label = { Text("密码") },
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+                RoleSelector(
+                    selected = state.userType,
+                    options = listOf(0, 1, 2),
+                    onSelected = viewModel::onUserTypeChanged,
+                )
+                AppPrimaryButton("创建用户", viewModel::createUser, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.sm))
             }
         }
         item {
@@ -161,11 +195,17 @@ private fun UserManagementScreen(
                 TextButton(viewModel::loadUsers) { Text("刷新") }
             }
         }
+        if (state.users.isEmpty()) {
+            item { EmptyState("暂无用户", "创建子账号后会显示在这里。", icon = "●") }
+        }
         items(state.users, key = SubaccountDto::subaccountId) { user ->
-            Card {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(user.identifier, fontWeight = FontWeight.SemiBold)
-                    Text(user.type.toRoleName(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            AppCard {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(user.identifier, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        StatusPill(user.type.toRoleName(), tone = if (user.type in setOf(0, 1)) AppTone.Ai else AppTone.Primary)
+                    }
+                    Text("ID：${user.subaccountId}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     Row {
                         TextButton(
                             onClick = { editingUser = user },
@@ -175,7 +215,7 @@ private fun UserManagementScreen(
                             TextButton(
                                 onClick = { deletingUser = user },
                                 enabled = user.subaccountId != currentUserId,
-                            ) { Text("删除") }
+                            ) { Text("删除", color = MaterialTheme.colorScheme.error) }
                         }
                     }
                 }
@@ -276,32 +316,42 @@ private fun DatasetManagementScreen(state: AdminUiState, viewModel: AdminViewMod
     }
     LazyColumn(
         modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(AppSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
     ) {
         item {
-            Card {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("新建数据集", fontWeight = FontWeight.Bold)
-                    OutlinedTextField(state.datasetName, viewModel::onDatasetNameChanged, Modifier.fillMaxWidth(), label = { Text("名称") })
-                    OutlinedTextField(state.datasetDescription, viewModel::onDatasetDescriptionChanged, Modifier.fillMaxWidth(), label = { Text("描述") })
-                    Button(viewModel::createDataset, enabled = !state.isLoading) { Text("创建数据集") }
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                MetricTile("知识库", state.datasets.size.toString(), Modifier.weight(1f), AppTone.Ai, "▤")
+                MetricTile("已启用", state.datasets.count { it.disabled == 0 }.toString(), Modifier.weight(1f), AppTone.Success, "✓")
+            }
+        }
+        item {
+            AppCard {
+                Text("新建知识库", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                OutlinedTextField(state.datasetName, viewModel::onDatasetNameChanged, Modifier.fillMaxWidth().padding(top = AppSpacing.sm), label = { Text("名称") })
+                OutlinedTextField(state.datasetDescription, viewModel::onDatasetDescriptionChanged, Modifier.fillMaxWidth().padding(top = AppSpacing.xs), label = { Text("描述") })
+                AppPrimaryButton("创建知识库", viewModel::createDataset, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.sm))
             }
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("数据集列表", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("知识库列表", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 TextButton(viewModel::loadDatasets) { Text("刷新") }
             }
         }
+        if (state.datasets.isEmpty()) {
+            item { EmptyState("暂无知识库", "创建知识库后可上传文档供 AI 检索。", icon = "▤") }
+        }
         items(state.datasets, key = DatasetItem::id) { dataset ->
-            Card {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(dataset.name.ifBlank { "数据集 ${dataset.id}" }, fontWeight = FontWeight.SemiBold)
+            AppCard {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(dataset.name.ifBlank { "知识库 ${dataset.id}" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        StatusPill(if (dataset.disabled == 0) "已启用" else "已禁用", tone = if (dataset.disabled == 0) AppTone.Success else AppTone.Neutral)
+                    }
                     if (dataset.description.isNotBlank()) Text(dataset.description)
-                    Text(if (dataset.disabled == 0) "已启用" else "已禁用")
-                    Row {
+                    Text("ID：${dataset.id}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
                         TextButton(onClick = {
                             viewModel.loadDatasetFiles(dataset.id)
                             filesOpen = true
@@ -309,7 +359,7 @@ private fun DatasetManagementScreen(state: AdminUiState, viewModel: AdminViewMod
                         TextButton(onClick = { viewModel.selectDatasetForUpload(dataset.id); picker.launch(arrayOf("*/*")) }) { Text("选择文件") }
                         TextButton(onClick = viewModel::upload, enabled = state.uploadDatasetId == dataset.id) { Text("上传") }
                         TextButton(onClick = { viewModel.toggleDataset(dataset) }) { Text(if (dataset.disabled == 0) "禁用" else "启用") }
-                        TextButton(onClick = { viewModel.deleteDataset(dataset.id) }) { Text("删除") }
+                        TextButton(onClick = { viewModel.deleteDataset(dataset.id) }) { Text("删除", color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }

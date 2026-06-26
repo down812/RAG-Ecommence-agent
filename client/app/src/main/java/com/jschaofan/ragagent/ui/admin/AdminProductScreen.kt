@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -30,6 +29,14 @@ import androidx.compose.ui.unit.dp
 import com.jschaofan.ragagent.data.remote.dto.ProductDetailDto
 import com.jschaofan.ragagent.data.remote.dto.ProductSkuAttributeDto
 import com.jschaofan.ragagent.data.remote.dto.ProductSkuDto
+import com.jschaofan.ragagent.ui.components.AppCard
+import com.jschaofan.ragagent.ui.components.AppCorners
+import com.jschaofan.ragagent.ui.components.AppPrimaryButton
+import com.jschaofan.ragagent.ui.components.AppSpacing
+import com.jschaofan.ragagent.ui.components.AppTone
+import com.jschaofan.ragagent.ui.components.EmptyState
+import com.jschaofan.ragagent.ui.components.MetricTile
+import com.jschaofan.ragagent.ui.components.StatusPill
 
 @Composable
 internal fun AdminProductScreen(
@@ -49,27 +56,46 @@ internal fun AdminProductScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(AppSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
     ) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Button(onClick = { creating = true }) { Text("新建商品") }
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                MetricTile("商品总数", state.products.size.toString(), Modifier.weight(1f), AppTone.Primary, "▣")
+                MetricTile("上架中", state.products.count { it.status == 1 }.toString(), Modifier.weight(1f), AppTone.Success, "↗")
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text("商品列表", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                AppPrimaryButton("新建商品", onClick = { creating = true })
                 TextButton(onClick = viewModel::loadProducts) { Text("刷新") }
             }
         }
+        if (state.products.isEmpty()) {
+            item { EmptyState("暂无商品", "新建商品后会显示在这里。", icon = "▣") }
+        }
         items(state.products, key = ProductDetailDto::id) { product ->
-            Card {
+            AppCard {
                 Column(
-                    Modifier.fillMaxWidth().padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                    Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
                 ) {
-                    Text(product.title, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text(product.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        StatusPill(
+                            text = if (product.status == 1) "上架中" else "已下架",
+                            tone = if (product.status == 1) AppTone.Success else AppTone.Danger,
+                        )
+                    }
                     Text(
                         "${product.productCode} · ${product.brand.orEmpty()} · ¥${product.basePrice ?: 0.0}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text("SKU：${product.skuList.size} · ${if (product.status == 1) "已上架" else "已下架"}")
+                    Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+                        StatusPill(text = "SKU ${product.skuList.size}", tone = AppTone.Primary)
+                        product.category?.takeIf(String::isNotBlank)?.let { StatusPill(text = it, tone = AppTone.Neutral) }
+                    }
                     Row {
                         TextButton(onClick = { editing = product }) { Text("编辑") }
                         TextButton(onClick = { viewModel.toggleProduct(product) }) {
@@ -79,7 +105,7 @@ internal fun AdminProductScreen(
                             imageProductId = product.id
                             imagePicker.launch("image/*")
                         }) { Text("更换图片") }
-                        TextButton(onClick = { deleting = product }) { Text("删除") }
+                        TextButton(onClick = { deleting = product }) { Text("删除", color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }

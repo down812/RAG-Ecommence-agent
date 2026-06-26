@@ -31,6 +31,7 @@ import com.jschaofan.ragagent.ui.product.detail.ProductDetailScreen
 import com.jschaofan.ragagent.ui.product.detail.ProductDetailViewModel
 import com.jschaofan.ragagent.ui.product.list.ProductListScreen
 import com.jschaofan.ragagent.ui.product.list.ProductListViewModel
+import com.jschaofan.ragagent.ui.profile.ProfileScreen
 import com.jschaofan.ragagent.ui.theme.RAGGuideAgentTheme
 
 class MainActivity : ComponentActivity() {
@@ -94,9 +95,11 @@ class MainActivity : ComponentActivity() {
             RAGGuideAgentTheme {
                 val cartState by cartViewModel.uiState.collectAsState()
                 var selectedProductId by remember { mutableStateOf<Long?>(null) }
+                var productReturnPage by remember { mutableStateOf(AppPage.PRODUCT_LIST) }
+                var cartReturnPage by remember { mutableStateOf(AppPage.PRODUCT_LIST) }
                 var page by remember {
                     mutableStateOf(
-                        if (tokenProvider.getToken().isNullOrBlank()) AppPage.LOGIN else AppPage.CHAT,
+                        if (tokenProvider.getToken().isNullOrBlank()) AppPage.LOGIN else AppPage.PRODUCT_LIST,
                     )
                 }
                 val navigate: (AppPage) -> Unit = { target ->
@@ -125,7 +128,7 @@ class MainActivity : ComponentActivity() {
                                 session.userType,
                                 session.identifier,
                             )
-                            navigate(AppPage.CHAT)
+                            navigate(AppPage.PRODUCT_LIST)
                         },
                     )
 
@@ -133,9 +136,13 @@ class MainActivity : ComponentActivity() {
                         viewModel = chatViewModel,
                         isAdmin = tokenProvider.getUserType() in setOf(0, 1),
                         cartItemCount = cartState.cart.totalQuantity,
-                        onCartClick = { navigate(AppPage.CART) },
+                        onCartClick = {
+                            cartReturnPage = AppPage.CHAT
+                            navigate(AppPage.CART)
+                        },
                         onProductsClick = { navigate(AppPage.PRODUCT_LIST) },
                         onAdminClick = { navigate(AppPage.ADMIN) },
+                        onBackClick = { navigate(AppPage.PRODUCT_LIST) },
                         onLogoutClick = {
                             loginViewModel.logout {
                                 tokenProvider.clearSession()
@@ -145,6 +152,7 @@ class MainActivity : ComponentActivity() {
                         onProductClick = { product ->
                             productDetailViewModel.loadProduct(product.id)
                             selectedProductId = product.id
+                            productReturnPage = AppPage.CHAT
                             navigate(AppPage.PRODUCT_DETAIL)
                         },
                         onAddToCart = { product ->
@@ -152,9 +160,11 @@ class MainActivity : ComponentActivity() {
                             if (cartProduct == null) {
                                 productDetailViewModel.loadProduct(product.id)
                                 selectedProductId = product.id
+                                productReturnPage = AppPage.CHAT
                                 navigate(AppPage.PRODUCT_DETAIL)
                             } else {
                                 cartViewModel.addProduct(cartProduct)
+                                cartReturnPage = AppPage.CHAT
                                 navigate(AppPage.CART)
                             }
                         },
@@ -162,10 +172,18 @@ class MainActivity : ComponentActivity() {
 
                     AppPage.PRODUCT_LIST -> ProductListScreen(
                         viewModel = productListViewModel,
-                        onBack = { navigate(AppPage.CHAT) },
+                        onBack = { navigate(AppPage.PRODUCT_LIST) },
+                        onChatClick = { navigate(AppPage.CHAT) },
+                        onCartClick = {
+                            cartReturnPage = AppPage.PRODUCT_LIST
+                            navigate(AppPage.CART)
+                        },
+                        onProfileClick = { navigate(AppPage.PROFILE) },
+                        cartItemCount = cartState.cart.totalQuantity,
                         onProductClick = { productId ->
                             productDetailViewModel.loadProduct(productId)
                             selectedProductId = productId
+                            productReturnPage = AppPage.PRODUCT_LIST
                             navigate(AppPage.PRODUCT_DETAIL)
                         },
                         onAddToCart = { product ->
@@ -173,9 +191,11 @@ class MainActivity : ComponentActivity() {
                             if (cartProduct == null) {
                                 productDetailViewModel.loadProduct(product.id)
                                 selectedProductId = product.id
+                                productReturnPage = AppPage.PRODUCT_LIST
                                 navigate(AppPage.PRODUCT_DETAIL)
                             } else {
                                 cartViewModel.addProduct(cartProduct)
+                                cartReturnPage = AppPage.PRODUCT_LIST
                                 navigate(AppPage.CART)
                             }
                         },
@@ -185,19 +205,43 @@ class MainActivity : ComponentActivity() {
                         viewModel = adminViewModel,
                         currentUserId = tokenProvider.getUserId(),
                         currentUserType = tokenProvider.getUserType() ?: 2,
-                        onBack = { navigate(AppPage.CHAT) },
+                        onBack = { navigate(AppPage.PROFILE) },
+                    )
+
+                    AppPage.PROFILE -> ProfileScreen(
+                        identifier = tokenProvider.getIdentifier().orEmpty(),
+                        userId = tokenProvider.getUserId(),
+                        userType = tokenProvider.getUserType() ?: 2,
+                        cartItemCount = cartState.cart.totalQuantity,
+                        onHomeClick = { navigate(AppPage.PRODUCT_LIST) },
+                        onChatClick = { navigate(AppPage.CHAT) },
+                        onCartClick = {
+                            cartReturnPage = AppPage.PROFILE
+                            navigate(AppPage.CART)
+                        },
+                        onAdminClick = { navigate(AppPage.ADMIN) },
+                        onLogoutClick = {
+                            loginViewModel.logout {
+                                tokenProvider.clearSession()
+                                navigate(AppPage.LOGIN)
+                            }
+                        },
                     )
 
                     AppPage.PRODUCT_DETAIL -> ProductDetailScreen(
                         viewModel = productDetailViewModel,
                         cartItemCount = cartState.cart.totalQuantity,
-                        onCartClick = { navigate(AppPage.CART) },
+                        onCartClick = {
+                            cartReturnPage = AppPage.PRODUCT_DETAIL
+                            navigate(AppPage.CART)
+                        },
                         onBack = {
                             selectedProductId = null
-                            navigate(AppPage.CHAT)
+                            navigate(productReturnPage)
                         },
                         onAddToCart = { product, sku ->
                             product.toAddCartProduct(sku)?.let(cartViewModel::addProduct)
+                            cartReturnPage = AppPage.PRODUCT_DETAIL
                             navigate(AppPage.CART)
                         },
                     )
@@ -205,12 +249,7 @@ class MainActivity : ComponentActivity() {
                     AppPage.CART -> CartScreen(
                         viewModel = cartViewModel,
                         onBack = {
-                            val destination = if (selectedProductId == null) {
-                                AppPage.CHAT
-                            } else {
-                                AppPage.PRODUCT_DETAIL
-                            }
-                            navigate(destination)
+                            navigate(cartReturnPage)
                         },
                         onCheckout = { navigate(AppPage.CHECKOUT) },
                     )
@@ -243,6 +282,7 @@ private enum class AppPage {
     LOGIN,
     CHAT,
     PRODUCT_LIST,
+    PROFILE,
     ADMIN,
     PRODUCT_DETAIL,
     CART,
