@@ -204,7 +204,9 @@ public class ChatServiceImpl implements ChatService {
                             .content(content)
                             .result(obj)
                             .messageType(log.getMessageType().name())
-                            .createdAt(log.getCreatedAt()).build());
+                            .createdAt(log.getCreatedAt())
+                            .metadata(log.getMetadata())
+                            .build());
                 } catch (Exception e) {
                     throw new GlobalException(Result.error(AIConstant.JSON_PARSE_FAILED));
                 }
@@ -214,7 +216,9 @@ public class ChatServiceImpl implements ChatService {
                         .messageId(log.getMessageId())
                         .content(log.getText())
                         .messageType(log.getMessageType().name())
-                        .createdAt(log.getCreatedAt()).build());
+                        .createdAt(log.getCreatedAt())
+                        .metadata(log.getMetadata())
+                        .build());
             }
         }
         return sessionInfos;
