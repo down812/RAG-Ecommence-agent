@@ -1,6 +1,5 @@
 package com.ecommerceserver.config;
 
-import org.springframework.ai.vectorstore.elasticsearch.ElasticsearchVectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 

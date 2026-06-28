@@ -2,12 +2,11 @@ package com.ecommerceserver.model.dto;
 
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import jakarta.validation.constraints.Pattern;
 
 /**
  * 修改子账号请求参数

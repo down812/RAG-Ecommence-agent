@@ -1,10 +1,16 @@
 package com.ecommerceserver.tool;
 
 import cn.hutool.core.collection.CollectionUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ecommerceserver.mapper.ProductMapper;
+import com.ecommerceserver.mapper.ProductSkuAttributeMapper;
+import com.ecommerceserver.mapper.ProductSkuMapper;
 import com.ecommerceserver.model.dto.ProductToolResult;
+import com.ecommerceserver.model.dto.SkuInfo;
 import com.ecommerceserver.model.entity.Product;
+import com.ecommerceserver.model.entity.ProductSku;
+import com.ecommerceserver.model.entity.ProductSkuAttribute;
 import com.ecommerceserver.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -25,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 public class ProductTool {
     private final ProductService productService;
     private final ProductMapper productMapper;
+    private final ProductSkuMapper productSkuMapper;
+    private final ProductSkuAttributeMapper productSkuAttributeMapper;
 
     private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5);
     private final ConcurrentHashMap<String, CacheEntry<?>> cache = new ConcurrentHashMap<>();
@@ -102,7 +111,7 @@ public class ProductTool {
             @ToolParam(required = false, description = "商品状态：1=上架，0=下架，默认查询上架商品") Integer status,
             @ToolParam(required = false, description = "排序字段：price(价格)、created_at(创建时间)") String sortBy,
             @ToolParam(required = false, description = "排序方向：asc(升序)、desc(降序)，默认降序") String sortOrder,
-            @ToolParam(required = false, description = "返回结果数量限制，默认20，最大100") Integer limit) {
+            @ToolParam(required = false, description = "返回结果数量限制，默认5，最大7") Integer limit) {
 
         QueryWrapper<Product> queryWrapper = new QueryWrapper<>();
 
@@ -114,25 +123,11 @@ public class ProductTool {
                     .or().like("product_code", keyword));
         }
 
-        if (brand != null && !brand.trim().isEmpty()) {
-            queryWrapper.eq("brand", brand);
-        }
-
-        if (category != null && !category.trim().isEmpty()) {
-            queryWrapper.eq("category", category);
-        }
-
-        if (subCategory != null && !subCategory.trim().isEmpty()) {
-            queryWrapper.eq("sub_category", subCategory);
-        }
-
-        if (minPrice != null) {
-            queryWrapper.ge("base_price", minPrice);
-        }
-
-        if (maxPrice != null) {
-            queryWrapper.le("base_price", maxPrice);
-        }
+        queryWrapper.eq(brand != null && !brand.trim().isEmpty(), "brand", brand)
+                .eq(category != null && !category.trim().isEmpty(), "category", category)
+                .eq(subCategory != null && !subCategory.trim().isEmpty(), "sub_category", subCategory)
+                .ge(minPrice != null, "base_price", minPrice)
+                .le(maxPrice != null, "base_price", maxPrice);
 
         if (status != null) {
             queryWrapper.eq("status", status);
@@ -156,7 +151,7 @@ public class ProductTool {
             queryWrapper.orderByDesc("base_price");
         }
 
-        int resultLimit = limit != null && limit > 0 ? Math.min(limit, 50) : 10;
+        int resultLimit = limit != null && limit > 0 ? Math.min(limit, 7) : 5;
         queryWrapper.last("LIMIT " + resultLimit);
 
         return Product.toToolResults(productMapper.selectList(queryWrapper));
@@ -172,31 +167,19 @@ public class ProductTool {
             @ToolParam(required = false, description = "二级分类名称，精确匹配，如'精华'、'智能手机'") String subCategory,
             @ToolParam(required = false, description = "最低价格筛选") BigDecimal minPrice,
             @ToolParam(required = false, description = "最高价格筛选") BigDecimal maxPrice,
-            @ToolParam(required = false, description = "返回结果数量限制，默认20，最大100") Integer limit) {
+            @ToolParam(required = false, description = "返回结果数量限制，默认5，最大7") Integer limit) {
 
         QueryWrapper<Product> queryWrapper = new QueryWrapper<>();
 
-        if (brandKeyword != null && !brandKeyword.trim().isEmpty()) {
-            queryWrapper.like("brand", brandKeyword);
-        }
+        queryWrapper.like(brandKeyword != null && !brandKeyword.trim().isEmpty(), "brand", brandKeyword)
+                .eq(category != null && !category.trim().isEmpty(), "category", category)
+                .eq(subCategory != null && !subCategory.trim().isEmpty(), "sub_category", subCategory)
+                .ge(minPrice != null, "base_price", minPrice)
+                .le(maxPrice != null, "base_price", maxPrice)
+                .eq("status", 1)
+                .orderByDesc("base_price");
 
-        if (category != null && !category.trim().isEmpty()) {
-            queryWrapper.eq("category", category);
-        }
-        if (subCategory != null && !subCategory.trim().isEmpty()) {
-            queryWrapper.eq("sub_category", subCategory);
-        }
-        if (minPrice != null) {
-            queryWrapper.ge("base_price", minPrice);
-        }
-        if (maxPrice != null) {
-            queryWrapper.le("base_price", maxPrice);
-        }
-
-        queryWrapper.eq("status", 1);
-        queryWrapper.orderByDesc("base_price");
-
-        int resultLimit = limit != null && limit > 0 ? Math.min(limit, 50) : 10;
+        int resultLimit = limit != null && limit > 0 ? Math.min(limit, 7) : 5;
         queryWrapper.last("LIMIT " + resultLimit);
 
         return Product.toToolResults(productMapper.selectList(queryWrapper));
@@ -220,22 +203,54 @@ public class ProductTool {
         return result;
     }
 
-    @Tool(description = "【必须调用】获取热门商品列表，按销量排序返回热门商品。" +
-            "当用户没有明确需求、想看热门推荐时，必须调用此工具获取真实热门商品数据。" +
-            "返回字段说明：id(商品ID), productCode(商品编码), title(商品名称), brand(品牌), category(一级分类), subCategory(二级分类), basePrice(价格), salesCount(销量), status(1=上架/0=下架), mainImageUrl(主图URL)。" +
-            "适用于：用户没有明确需求时的商品推荐、热门商品展示。")
-    public List<ProductToolResult> getHotProducts(@ToolParam(required = false, description = "返回数量，默认10，最大50") Integer limit) {
-        int resultLimit = limit != null && limit > 0 ? Math.min(limit, 50) : 10;
-        String cacheKey = "hot:" + resultLimit;
-        List<ProductToolResult> cached = getCache(cacheKey);
+    @Tool(description = "【加入购物车前必须调用】查询指定商品的可选规格(SKU)列表。" +
+            "当用户明确要把某个商品加入购物车时，先用本工具传入该商品的productId查出其可选规格，" +
+            "再让用户确认要哪个规格，然后用addToCart加购。" +
+            "返回字段说明：skuId(规格ID，加购时传入), skuCode(规格编码), price(规格价格), spec(规格描述，如'颜色:黑色, 容量:128GB')。")
+    public List<SkuInfo> getProductSkus(@ToolParam(description = "商品ID") Long productId) {
+        if (productId == null) {
+            return new ArrayList<>();
+        }
+        String cacheKey = "skus:" + productId;
+        List<SkuInfo> cached = getCache(cacheKey);
         if (cached != null) {
             return cached;
         }
-        QueryWrapper<Product> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("status", 1)
-                .orderByDesc("base_price")
-                .last("LIMIT " + resultLimit);
-        List<ProductToolResult> result = Product.toToolResults(productMapper.selectList(queryWrapper));
+
+        // 1. 查该商品上架的 SKU
+        List<ProductSku> skus = productSkuMapper.selectList(new LambdaQueryWrapper<ProductSku>()
+                .eq(ProductSku::getProductId, productId)
+                .eq(ProductSku::getStatus, 1));
+        if (CollectionUtil.isEmpty(skus)) {
+            return new ArrayList<>();
+        }
+
+        // 2. 一次性批量查这些 SKU 的属性，避免 N+1
+        List<Long> skuIds = skus.stream().map(ProductSku::getId).toList();
+        List<ProductSkuAttribute> attrs = productSkuAttributeMapper.selectList(
+                new LambdaQueryWrapper<ProductSkuAttribute>().in(ProductSkuAttribute::getSkuId, skuIds));
+        Map<Long, List<ProductSkuAttribute>> attrsBySkuId = attrs.stream()
+                .collect(Collectors.groupingBy(ProductSkuAttribute::getSkuId));
+
+        // 3. 组装 SkuInfo（规格拼接方式与 CartServiceImpl.convertToCartItemVO 保持一致）
+        List<SkuInfo> result = skus.stream().map(sku -> {
+            List<ProductSkuAttribute> skuAttrs = attrsBySkuId.get(sku.getId());
+            String spec;
+            if (skuAttrs != null && !skuAttrs.isEmpty()) {
+                spec = skuAttrs.stream()
+                        .map(a -> a.getAttrName() + ":" + a.getAttrValue())
+                        .collect(Collectors.joining(", "));
+            } else {
+                spec = "SKU:" + sku.getSkuCode();
+            }
+            return SkuInfo.builder()
+                    .skuId(sku.getId())
+                    .skuCode(sku.getSkuCode())
+                    .price(sku.getPrice())
+                    .spec(spec)
+                    .build();
+        }).collect(Collectors.toList());
+
         putCache(cacheKey, result);
         return result;
     }

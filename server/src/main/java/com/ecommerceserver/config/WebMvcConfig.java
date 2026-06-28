@@ -1,9 +1,9 @@
 package com.ecommerceserver.config;
 
-import com.google.common.collect.Lists;
 import com.ecommerceserver.interceptor.AccessLimitInterceptor;
 import com.ecommerceserver.interceptor.JwtInterceptor;
 import com.ecommerceserver.interceptor.LoginInterceptor;
+import com.google.common.collect.Lists;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

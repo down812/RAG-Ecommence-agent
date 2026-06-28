@@ -1,7 +1,6 @@
 package com.ecommerceserver.controller.user;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.ecommerceserver.context.LoginContext;
 import com.ecommerceserver.model.dto.EvaluateDTO;
 import com.ecommerceserver.model.dto.EvaluatePageDTO;
 import com.ecommerceserver.model.entity.Evaluate;

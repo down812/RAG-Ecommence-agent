@@ -2,8 +2,6 @@
 
 package com.ecommerceserver.model.vo;
 
-import com.baomidou.mybatisplus.annotation.*;
-import com.ecommerceserver.model.entity.ProductSkuAttribute;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,7 +10,6 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Data

@@ -17,7 +17,6 @@ import com.ecommerceserver.service.EvaluateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
-import org.codehaus.groovy.util.StringUtil;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;

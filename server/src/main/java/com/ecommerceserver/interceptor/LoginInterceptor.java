@@ -5,15 +5,16 @@ import com.ecommerceserver.context.LoginContext.LoginUserDTO;
 import com.ecommerceserver.exception.PermissionDeniedException;
 import io.jsonwebtoken.Claims;
 import jakarta.annotation.Resource;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.web.servlet.HandlerInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.web.servlet.HandlerInterceptor;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 
-import static com.ecommerceserver.constants.CommonConstant.*;
-import static com.ecommerceserver.constants.MessageConstant.*;
+import static com.ecommerceserver.constants.CommonConstant.LOGIN_USER_ID;
+import static com.ecommerceserver.constants.CommonConstant.LOGIN_USER_TYPE;
 
 /**
  * 登录拦截器：基于JWT令牌解析用户信息，存入上下文并做权限校验

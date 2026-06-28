@@ -4,8 +4,6 @@ import com.ecommerceserver.constants.JwtConstant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
-import static com.ecommerceserver.constants.JwtConstant.*;
-
 /**
  * JWT 配置类：读取 E-commerceServer.jwt 节点下的配置
  */

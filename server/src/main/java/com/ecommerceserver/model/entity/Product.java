@@ -1,13 +1,13 @@
 package com.ecommerceserver.model.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.ecommerceserver.model.dto.ProductToolResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import com.ecommerceserver.model.dto.ProductToolResult;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

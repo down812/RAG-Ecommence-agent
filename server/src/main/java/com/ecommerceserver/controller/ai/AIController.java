@@ -1,7 +1,9 @@
 package com.ecommerceserver.controller.ai;
 
 import com.ecommerceserver.aop.AccessLimit;
-import com.ecommerceserver.model.vo.*;
+import com.ecommerceserver.model.vo.AiMessage;
+import com.ecommerceserver.model.vo.SessionInfo;
+import com.ecommerceserver.model.vo.SessionList;
 import com.ecommerceserver.result.Result;
 import com.ecommerceserver.service.ChatService;
 import com.ecommerceserver.utils.StructuredOutputConverter;
@@ -15,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
+
 import java.util.List;
 
 @Tag(name = "智慧助手", description = "提供商品推荐、商品对比、商品搜索等AI对话服务")

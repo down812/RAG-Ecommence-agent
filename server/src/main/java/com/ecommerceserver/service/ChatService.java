@@ -1,7 +1,5 @@
 package com.ecommerceserver.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
-import com.ecommerceserver.model.entity.Log;
 import com.ecommerceserver.model.vo.AiMessage;
 import com.ecommerceserver.model.vo.SessionInfo;
 import com.ecommerceserver.model.vo.SessionList;

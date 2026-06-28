@@ -8,7 +8,9 @@ import com.ecommerceserver.config.JwtConfig;
 import com.ecommerceserver.exception.AuthFailException;
 import com.ecommerceserver.exception.LoginFailException;
 import com.ecommerceserver.mapper.UserMapper;
-import com.ecommerceserver.model.dto.*;
+import com.ecommerceserver.model.dto.RedisUserMsgDTO;
+import com.ecommerceserver.model.dto.UserAuthDTO;
+import com.ecommerceserver.model.dto.UserLoginDTO;
 import com.ecommerceserver.model.entity.User;
 import com.ecommerceserver.model.vo.UserAuthVO;
 import com.ecommerceserver.model.vo.UserLoginVO;
@@ -29,7 +31,8 @@ import java.util.concurrent.TimeUnit;
 
 import static com.ecommerceserver.constants.CommonConstant.*;
 import static com.ecommerceserver.constants.MessageConstant.*;
-import static com.ecommerceserver.constants.RedisConstant.*;
+import static com.ecommerceserver.constants.RedisConstant.EMAIL_CODE_KEY;
+import static com.ecommerceserver.constants.RedisConstant.LOGIN_USER_TOKEN;
 
 
 
