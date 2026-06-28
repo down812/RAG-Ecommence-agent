@@ -268,10 +268,7 @@ public class VectorKnowledgeServiceImpl implements VectorKnowledgeService {
                 return false;
             }
 
-            Long datasetId = datasetFile.getDatasetId();
-            if (!deleteByDatasetId(datasetId)) {
-                return false;
-            }
+            deleteByDatasetId(datasetFile.getDatasetId());
 
             File file = new File(datasetFile.getFilePath());
             if (file.exists()) {
@@ -282,10 +279,6 @@ public class VectorKnowledgeServiceImpl implements VectorKnowledgeService {
             }
 
             datasetFilesMapper.deleteById(id);
-            if (!rebuildByDatasetId(datasetId)) {
-                log.error("Failed to rebuild dataset vectors after deleting file: {}", datasetId);
-                return false;
-            }
 
             log.info("删除文件成功: {}", fileId);
             return true;

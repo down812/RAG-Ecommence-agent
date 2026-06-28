@@ -209,45 +209,6 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetMapper, DataSet> impl
     }
 
     @Override
-    public List<DatasetFiles> getDatasetFiles(Long datasetId) {
-        requireDatasetAccess(datasetId);
-        return datasetFilesMapper.selectList(
-                new LambdaQueryWrapper<DatasetFiles>()
-                        .eq(DatasetFiles::getDatasetId, datasetId)
-                        .orderByDesc(DatasetFiles::getCreatedAt)
-        );
-    }
-
-    @Override
-    public DatasetFiles getDatasetFile(Long fileId) {
-        DatasetFiles file = datasetFilesMapper.selectById(fileId);
-        if (file == null) {
-            throw new GlobalException(Result.error(DatasetConstant.FILE_NOT_EXIST));
-        }
-        requireDatasetAccess(file.getDatasetId());
-        return file;
-    }
-
-    private DataSet requireDatasetAccess(Long datasetId) {
-        Long userId = LoginContext.getUserId();
-        LoginContext.LoginUserDTO loginUser = LoginContext.getUser();
-        if (userId == null) {
-            throw new GlobalException(Result.error(DatasetConstant.USER_ID_NOT_NULL));
-        }
-        DataSet dataSet = this.getById(datasetId);
-        if (dataSet == null) {
-            throw new GlobalException(Result.error(DatasetConstant.DATASET_NOT_EXIST));
-        }
-        boolean isAdmin = loginUser != null &&
-                (loginUser.getUserType().equals(UserEnum.ADMIN.getCode()) ||
-                 loginUser.getUserType().equals(UserEnum.SUPER_ADMIN.getCode()));
-        if (!dataSet.getUserId().equals(userId) && !isAdmin) {
-            throw new GlobalException(Result.error(DatasetConstant.NO_PERMISSION));
-        }
-        return dataSet;
-    }
-
-    @Override
     public boolean deleteDataSet(Long datasetId) {
         Long userId = LoginContext.getUserId();
         LoginContext.LoginUserDTO loginUser = LoginContext.getUser();

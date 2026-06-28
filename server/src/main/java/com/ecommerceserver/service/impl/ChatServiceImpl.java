@@ -7,6 +7,7 @@ import com.ecommerceserver.Enum.AIRspEnum;
 import com.ecommerceserver.Enum.SourceEnum;
 import com.ecommerceserver.advisor.DatabaseChatMemory;
 import com.ecommerceserver.constants.AIConstant;
+import com.ecommerceserver.constants.SystemConstant;
 import com.ecommerceserver.context.LoginContext;
 import com.ecommerceserver.exception.GlobalException;
 import com.ecommerceserver.mapper.ProductMapper;
@@ -53,6 +54,7 @@ public class ChatServiceImpl implements ChatService {
     private final ProductMapper productMapper;
     private final ChatSummaryService chatSummaryService;
     private final org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor questionAnswerAdvisor;
+    private final com.ecommerceserver.service.OSSService ossService;
 
     private final ConcurrentHashMap<String, Sinks.One<Void>> stopSignals = new ConcurrentHashMap<>();
 
@@ -85,6 +87,8 @@ public class ChatServiceImpl implements ChatService {
         // 通过按 sessionId 的静态快照跨线程透传，doFinally 中清理。
         com.ecommerceserver.tool.AiToolUserContext.bind(sessionId, userId);
         List<Media> mediaList = buildMediaList(files);
+        // 有图片时并行上传 OSS，失败单张跳过（不中断对话）
+        List<String> imageUrls = uploadImagesToOss(files, sessionId);
 
         Sinks.One<Void> stopSignal = Sinks.one();
         String stopKey = sessionId + ":" + messageId;
@@ -111,11 +115,16 @@ public class ChatServiceImpl implements ChatService {
                 .advisors(a -> {
                     a.param(CHAT_MEMORY_CONVERSATION_ID_KEY, sessionId)
                             .param("userId", userId != null ? userId : 0L)
-                            .param("messageId", messageId != null ? messageId : "");
+                            .param("messageId", messageId != null ? messageId : "")
+                            .param("imageUrls", imageUrls);
                     if (needRetrieval) {
                         a.advisors(questionAnswerAdvisor);
                     }
                 });
+
+        if (!mediaList.isEmpty()) {
+            promptSpec.system(SystemConstant.IMAGE_CATEGORY_TABLE);
+        }
 
         Flux<String> chunkFlux = promptSpec
                 .stream()
@@ -486,16 +495,29 @@ public class ChatServiceImpl implements ChatService {
             "好的", "嗯嗯", "ok", "收到", "知道了"
     );
 
+    // 加购/确认类操作指令：无需检索知识库，直接走工具调用即可
+    private static final java.util.Set<String> NO_RETRIEVAL_PATTERNS = java.util.Set.of(
+            "加入购物车", "加购", "加到购物车", "帮我加", "放入购物车",
+            "就要这个", "就这个", "确认购买", "确认下单", "帮我买",
+            "我要", "需要几件", "要几件", "加几件", "买几件"
+    );
+
     /**
      * 判断本轮是否需要检索向量知识库。
      * 策略：保守优先——默认需要检索（保证回答质量），
-     * 仅当消息很短且整体就是纯问候/寒暄时才跳过，避免对“你好”这类也触发跨厂商 embedding + ES 检索。
+     * 仅当消息很短且整体就是纯问候/寒暄，或属于加购/确认等操作指令时才跳过。
      */
     private boolean needKnowledgeRetrieval(String content) {
         if (content == null || content.isBlank()) {
             return false;
         }
         String text = content.trim().toLowerCase();
+        // 操作类指令无论长短都不需要知识库
+        for (String p : NO_RETRIEVAL_PATTERNS) {
+            if (text.contains(p)) {
+                return false;
+            }
+        }
         // 较长的输入大概率含实质诉求，直接走检索
         if (text.length() > 15) {
             return true;
@@ -507,6 +529,24 @@ public class ChatServiceImpl implements ChatService {
             }
         }
         return true;
+    }
+
+    /** 将文件上传至 OSS，返回公开 URL 列表；单个文件失败时跳过，不中断对话。 */
+    private List<String> uploadImagesToOss(List<MultipartFile> files, String sessionId) {
+        if (files == null || files.isEmpty()) return List.of();
+        List<String> urls = new ArrayList<>();
+        for (MultipartFile f : files) {
+            if (f == null || f.isEmpty()) continue;
+            try {
+                String ext = com.ecommerceserver.utils.FileUtil.getFileSuffix(
+                        f.getOriginalFilename() != null ? f.getOriginalFilename() : "file.bin");
+                String objectName = "chat/" + sessionId + "/" + java.util.UUID.randomUUID() + ext;
+                urls.add(ossService.uploadFile(f, objectName));
+            } catch (Exception e) {
+                log.warn("图片上传OSS失败，跳过: {}", e.getMessage());
+            }
+        }
+        return urls;
     }
 
     private List<Media> buildMediaList(List<MultipartFile> files) {

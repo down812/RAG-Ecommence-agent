@@ -38,18 +38,6 @@ public class EvaluateServiceImpl extends ServiceImpl<EvaluateMapper, Evaluate> i
             throw new GlobalException(Result.error(EvaluateConstant.EVALUATE_INVALID_RATING));
         }
         
-        Evaluate existing = this.getOne(new LambdaQueryWrapper<Evaluate>()
-                .eq(Evaluate::getUserId, userId)
-                .eq(Evaluate::getMessageId, evaluateDTO.getMessageId()));
-        if (existing != null) {
-            existing.setSessionId(evaluateDTO.getSessionId());
-            existing.setRating(evaluateDTO.getRating());
-            existing.setComment(evaluateDTO.getComment());
-            existing.setUpdatedAt(DateUtil.formatDateTime(new Date()));
-            this.updateById(existing);
-            return existing;
-        }
-
         Evaluate evaluate = Evaluate.builder()
                 .userId(userId)
                 .sessionId(evaluateDTO.getSessionId())
@@ -67,10 +55,8 @@ public class EvaluateServiceImpl extends ServiceImpl<EvaluateMapper, Evaluate> i
     
     @Override
     public Evaluate getEvaluateByMessageId(String messageId) {
-        Long userId = LoginContext.getUserId();
         LambdaQueryWrapper<Evaluate> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Evaluate::getMessageId, messageId)
-                .eq(Evaluate::getUserId, userId);
+        wrapper.eq(Evaluate::getMessageId, messageId);
         Evaluate one = this.getOne(wrapper);
         if (one == null) {
             throw new GlobalException(Result.error(EvaluateConstant.EVALUATE_NOT_FOUND));
@@ -80,10 +66,8 @@ public class EvaluateServiceImpl extends ServiceImpl<EvaluateMapper, Evaluate> i
     
     @Override
     public Evaluate getEvaluateBySessionId(String sessionId) {
-        Long userId = LoginContext.getUserId();
         LambdaQueryWrapper<Evaluate> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Evaluate::getSessionId, sessionId)
-                .eq(Evaluate::getUserId, userId);
+        wrapper.eq(Evaluate::getSessionId, sessionId);
         wrapper.orderByDesc(Evaluate::getCreatedAt);
         wrapper.last("LIMIT 1");
         Evaluate one = this.getOne(wrapper);
@@ -128,10 +112,8 @@ public class EvaluateServiceImpl extends ServiceImpl<EvaluateMapper, Evaluate> i
     
     @Override
     public boolean deleteEvaluateByMessageId(String messageId) {
-        Long userId = LoginContext.getUserId();
         LambdaQueryWrapper<Evaluate> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Evaluate::getMessageId, messageId)
-                .eq(Evaluate::getUserId, userId);
+        wrapper.eq(Evaluate::getMessageId, messageId);
 
         Evaluate evaluate = this.getOne(wrapper);
         if (evaluate == null) {
