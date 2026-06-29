@@ -123,7 +123,7 @@ public class ChatServiceImpl implements ChatService {
                 });
 
         if (!mediaList.isEmpty()) {
-            promptSpec.system(SystemConstant.IMAGE_CATEGORY_TABLE);
+            promptSpec.system(SystemConstant.getSystemPrompt() + SystemConstant.IMAGE_CATEGORY_TABLE);
         }
 
         Flux<String> chunkFlux = promptSpec
